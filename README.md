@@ -27,38 +27,38 @@ This is a complete rewrite of the 2020-era `stack-in-card@0.2.0` on a
 current Home Assistant frontend stack (HA 2025.1+).
 
 ### Modernisation
-- **Lit 3 + TypeScript 5.7 + Rollup 4** — full migration from Lit-element 2 / TS 4 / Rollup 2
-- **No `custom-card-helpers`** — local types, modern HA `loadCardHelpers()`-only path
-- **Style-application via `MutationObserver`** — replaces the fragile `setTimeout(500)` of the original; late-mounted nested cards (e.g. `mushroom`, `button-card`) get their styles applied as they mount
-- **Race-condition guarded** — monotonic generation counter on async stack creation; rapid config updates from the editor can no longer overwrite each other
+- ⚡ **Lit 3 + TypeScript 5.7 + Rollup 4** — full migration from Lit-element 2 / TS 4 / Rollup 2
+- 📦 **No `custom-card-helpers`** — local types, modern HA `loadCardHelpers()`-only path
+- 👀 **Style-application via `MutationObserver`** — replaces the fragile `setTimeout(500)` of the original; late-mounted nested cards (e.g. `mushroom`, `button-card`) get their styles applied as they mount
+- 🏁 **Race-condition guarded** — monotonic generation counter on async stack creation; rapid config updates from the editor can no longer overwrite each other
 
 ### Visual editor (new in v2)
 Matches HA's own stack-card editor 1:1:
-- **Native `<ha-tab-group>` tabs** for switching between child cards (falls back to styled buttons on HA versions without it)
-- **Action row** — GUI/YAML toggle, RTL-aware move-before / move-after, copy, cut, delete (same icons + German translations as HA's built-in editor)
-- **Embedded `<hui-card-picker>`** for adding cards — full picker UX with built-in, custom, and HACS cards. Used inline, no `show-create-card-dialog` round-trip
-- **Paste-from-clipboard banner** — shares HA's `dashboardCardClipboard` sessionStorage key, so cards copied from any HA editor (built-in stack, this card, etc.) can be pasted here
-- **Embedded `<hui-card-element-editor>`** per child — the same nested editor HA uses; auto-detects per-type GUI editors, falls back to YAML for types that don't ship one. Re-mounted on every reorder via Lit's `keyed()` directive (same mechanism HA itself uses) so reorder actually persists in YAML
-- **Empty stack opens directly in the picker** — adding the card drops the user straight into card selection, no placeholder children to delete first
-- **Inline empty-state placeholder** — never a spinning preview in the picker
+- 🗂️ **Native `<ha-tab-group>` tabs** for switching between child cards (falls back to styled buttons on HA versions without it)
+- 🎛️ **Action row** — GUI/YAML toggle, RTL-aware move-before / move-after, copy, cut, delete (same icons + German translations as HA's built-in editor)
+- ➕ **Embedded `<hui-card-picker>`** for adding cards — full picker UX with built-in, custom, and HACS cards. Used inline, no `show-create-card-dialog` round-trip
+- 📋 **Paste-from-clipboard banner** — shares HA's `dashboardCardClipboard` sessionStorage key, so cards copied from any HA editor (built-in stack, this card, etc.) can be pasted here
+- 🧩 **Embedded `<hui-card-element-editor>`** per child — the same nested editor HA uses; auto-detects per-type GUI editors, falls back to YAML for types that don't ship one. Re-mounted on every reorder via Lit's `keyed()` directive (same mechanism HA itself uses) so reorder actually persists in YAML
+- 🚪 **Empty stack opens directly in the picker** — adding the card drops the user straight into card selection, no placeholder children to delete first
+- 🪧 **Inline empty-state placeholder** — never a spinning preview in the picker
 
 ### Custom CSS
-- **Top-level `styles`** — CSS applied to the outer **stack card** (`ha-card` wrapper)
-- **Per-child `cards[i].styles`** — CSS injected into a single child's shadow DOM only (no leak to siblings)
-- Both edited via `<ha-code-editor>` with entity / icon autocompletion in the visual editor
-- Per-child styles travel with the card across reorder / copy / paste
+- 🎨 **Top-level `styles`** — CSS applied to the outer **stack card** (`ha-card` wrapper)
+- 🎯 **Per-child `cards[i].styles`** — CSS injected into a single child's shadow DOM only (no leak to siblings)
+- ✏️ Both edited via `<ha-code-editor>` with entity / icon autocompletion in the visual editor
+- 🧳 Per-child styles travel with the card across reorder / copy / paste
 
 ### Bug fixes carried over
-- **Element double-registration guard** — loading the bundle twice (HACS + manual resource) no longer throws `NotSupportedError`
-- **Card validation in `setConfig`** — rejects unknown `mode` values and non-array `cards`
-- **Cleanup on disconnect** — animation frames, mutation observer, and card promise all torn down in `disconnectedCallback`
-- **`customCards.type` without `custom:` prefix** — HA's picker calls `document.createElement(type)` on this value; the prefix would fail silently and hang the preview tile
+- 🔁 **Element double-registration guard** — loading the bundle twice (HACS + manual resource) no longer throws `NotSupportedError`
+- ✅ **Card validation in `setConfig`** — rejects unknown `mode` values and non-array `cards`
+- 🧹 **Cleanup on disconnect** — animation frames, mutation observer, and card promise all torn down in `disconnectedCallback`
+- 🔍 **`customCards.type` without `custom:` prefix** — HA's picker calls `document.createElement(type)` on this value; the prefix would fail silently and hang the preview tile
 
 ### CI / packaging
-- **`dist/stack-in-card.js` shipped in master** — HACS finds the built file directly, no manual release required for installation
-- **Auto-build on push** — `.github/workflows/build.yml` typechecks, builds, and commits `dist/` back to master
-- **Tagged-release workflow** — `git tag v2.x.x && git push --tags` builds and creates a GitHub Release with the JS file as an asset
-- **HACS validation workflow** — verifies the repo stays HACS-compliant on every push
+- 📦 **`dist/stack-in-card.js` shipped in master** — HACS finds the built file directly, no manual release required for installation
+- 🤖 **Auto-build on push** — `.github/workflows/build.yml` typechecks, builds, and commits `dist/` back to master
+- 🏷️ **Tagged-release workflow** — `git tag v2.x.x && git push --tags` builds and creates a GitHub Release with the JS file as an asset
+- ✔️ **HACS validation workflow** — verifies the repo stays HACS-compliant on every push
 
 For the full version history see [CHANGELOG.md](CHANGELOG.md).
 
