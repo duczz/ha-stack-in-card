@@ -1,100 +1,304 @@
-# Stack In Card by [@RomRider](https://www.github.com/RomRider)
+<div align="center">
 
-A replacement for [vertical-stack-in-card](https://github.com/ofekashery/vertical-stack-in-card) and `horizontal-stack-in-card`
+# Stack In Card
 
-It allows to group multiple cards into one card without the borders. By default, it will stack everything vertically.
+### A modern stack card for Home Assistant Lovelace UI
 
-[![GitHub Release][releases-shield]][releases]
-[![License][license-shield]](LICENSE.md)
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg?style=for-the-badge)](https://github.com/custom-components/hacs)
+[![HACS][hacs-badge]][hacs-url]
+[![Home Assistant][ha-badge]][ha-url]
+[![Version][version-badge]][release-url]
+[![Downloads][downloads-badge]][release-url]
+[![License][license-badge]](LICENSE)
 
-![Project Maintenance][maintenance-shield]
-[![GitHub Activity][commits-shield]][commits]
+</div>
 
-[![Discord][discord-shield]][discord]
-[![Community Forum][forum-shield]][forum]
+---
 
-## Options
+A modernised replacement for `vertical-stack-in-card` and
+`horizontal-stack-in-card`. Group multiple Lovelace cards into a single
+seamless card — without inner borders, shadows or padding gaps. Includes a
+**HA-native visual editor** and **per-card custom CSS**.
 
-If a card inside the stack has the `--keep-background` CSS style defined, it will not replace the background. This is usefull for [button-card](https://github.com/custom-cards/button-card) for example. You can also define this CSS variable by using [card-mod](https://github.com/thomasloven/lovelace-card-mod).
+---
 
-| Name | Type | Requirement | Description | Default |
-| ---- | ---- | ----------- | ----------- | ------- |
-| `type` | string  | **Required** | `custom:stack-in-card` | |
-| `title` | string  | **Optional** | Header of the card | |
-| `mode` | string  | **Optional** | `vertical` or `horizontal` stack | `vertical` |
-| `cards` | object  | **Required** | The cards you want to embed | `none` |
-| `keep` | object | **Optional** | See [keep object](#keep-object) | |
+## 🛠️ What's different from the original
 
-### `keep` object
+This is a complete rewrite of the 2020-era `stack-in-card@0.2.0` on a
+current Home Assistant frontend stack (HA 2025.1+).
 
-| Name | Type | Requirement | Description | Default |
-| ---- | ---- | ----------- | ----------- | ------- |
-| `background` | boolean | **Optional** | Will keep the background on **all** the child cards. To keep the background on specific cards only, assign the CSS variable `--keep-background: 'true'` on the card where you want to keep the background.  | `false` |
-| `box_shadow` | boolean | **Optional** | Will keep the `box-shadow` on **all** the child cards | `false` |
-| `margin` | boolean | **Optional** | Will keep the `margin` between **all** the child cards | `false` |
-| `outer_padding` | boolean | **Optional** | Will add a `padding` of `8px` to the card if `margin` is `true` | `true` if `margin` is `true`, else false |
-| `border_radius` | boolean | **Optional** | Will keep the `border-radius` on **all** the child cards | `false` |
+### Modernisation
+- **Lit 3 + TypeScript 5.7 + Rollup 4** — full migration from Lit-element 2 / TS 4 / Rollup 2
+- **No `custom-card-helpers`** — local types, modern HA `loadCardHelpers()`-only path
+- **Style-application via `MutationObserver`** — replaces the fragile `setTimeout(500)` of the original; late-mounted nested cards (e.g. `mushroom`, `button-card`) get their styles applied as they mount
+- **Race-condition guarded** — monotonic generation counter on async stack creation; rapid config updates from the editor can no longer overwrite each other
 
-## Example
+### Visual editor (new in v2)
+Matches HA's own stack-card editor 1:1:
+- **Native `<ha-tab-group>` tabs** for switching between child cards (falls back to styled buttons on HA versions without it)
+- **Action row** — GUI/YAML toggle, RTL-aware move-before / move-after, copy, cut, delete (same icons + German translations as HA's built-in editor)
+- **Embedded `<hui-card-picker>`** for adding cards — full picker UX with built-in, custom, and HACS cards. Used inline, no `show-create-card-dialog` round-trip
+- **Paste-from-clipboard banner** — shares HA's `dashboardCardClipboard` sessionStorage key, so cards copied from any HA editor (built-in stack, this card, etc.) can be pasted here
+- **Embedded `<hui-card-element-editor>`** per child — the same nested editor HA uses; auto-detects per-type GUI editors, falls back to YAML for types that don't ship one. Re-mounted on every reorder via Lit's `keyed()` directive (same mechanism HA itself uses) so reorder actually persists in YAML
+- **Empty stack opens directly in the picker** — adding the card drops the user straight into card selection, no placeholder children to delete first
+- **Inline empty-state placeholder** — never a spinning preview in the picker
 
-### Simple Example
+### Custom CSS
+- **Top-level `styles`** — CSS applied to the outer **stack card** (`ha-card` wrapper)
+- **Per-child `cards[i].styles`** — CSS injected into a single child's shadow DOM only (no leak to siblings)
+- Both edited via `<ha-code-editor>` with entity / icon autocompletion in the visual editor
+- Per-child styles travel with the card across reorder / copy / paste
 
-![example](docs/Example.png)
+### Bug fixes carried over
+- **Element double-registration guard** — loading the bundle twice (HACS + manual resource) no longer throws `NotSupportedError`
+- **Card validation in `setConfig`** — rejects unknown `mode` values and non-array `cards`
+- **Cleanup on disconnect** — animation frames, mutation observer, and card promise all torn down in `disconnectedCallback`
+- **`customCards.type` without `custom:` prefix** — HA's picker calls `document.createElement(type)` on this value; the prefix would fail silently and hang the preview tile
 
-```yaml
-- type: custom:stack-in-card
-  title: My Stack In Card
-  mode: vertical
-  cards:
-    - type: horizontal-stack
-      cards:
-        - type: button
-          entity: sun.sun
-        - type: button
-          entity: sun.sun
-    - type: vertical-stack
-      cards:
-        - type: entities
-          entities:
-            - sun.sun
-```
+### CI / packaging
+- **`dist/stack-in-card.js` shipped in master** — HACS finds the built file directly, no manual release required for installation
+- **Auto-build on push** — `.github/workflows/build.yml` typechecks, builds, and commits `dist/` back to master
+- **Tagged-release workflow** — `git tag v2.x.x && git push --tags` builds and creates a GitHub Release with the JS file as an asset
+- **HACS validation workflow** — verifies the repo stays HACS-compliant on every push
 
-### Example with button-card to keep the background
+For the full version history see [CHANGELOG.md](CHANGELOG.md).
 
-This will keep the background of the button even if stacked:
+---
 
-```yaml
-- type: custom:stack-in-card
-  title: My Stack In Card
-  mode: vertical
-  cards:
-    - type: custom:button-card
-      entity: sun.sun
-      color_type: card
-      styles:
-        card:
-          - --keep-background: 'true'
-```
+## Table of Contents
 
-## Installation
+- [What's different](#️-whats-different-from-the-original)
+- [Requirements](#-requirements)
+- [Installation](#-installation)
+- [Visual Editor](#-visual-editor)
+- [Configuration](#️-configuration)
+  - [All options](#all-options)
+  - [Keep object](#keep-object)
+- [Custom CSS](#-custom-css)
+  - [Stack-card CSS](#stack-card-css)
+  - [Per-child CSS](#per-child-css)
+  - [Tips](#tips)
+- [Examples](#-examples)
+- [Migration from the original `stack-in-card`](#-migration-from-the-original-stack-in-card)
 
-Use [HACS](https://hacs.xyz) or follow this [guide](https://github.com/thomasloven/hass-config/wiki/Lovelace-Plugins)
+---
+
+## 📦 Requirements
+
+- **Home Assistant 2025.1** or newer
+  *(some editor features — `<ha-tab-group>`, `<hui-card-element-editor>`, `@mdi/js` icon paths — rely on frontend changes from late 2024 / early 2025. On HA 2025.10+ the editor uses the native tab control; on older versions it falls back to styled buttons.)*
+- HACS (recommended) or manual install
+
+---
+
+## 🚀 Installation
+
+### HACS (recommended)
+
+1. Open **HACS** in Home Assistant
+2. Go to **Frontend** → three-dot menu → **Custom repositories**
+3. Add this repository URL, category: **Lovelace**
+4. Search for **Stack In Card** and install
+5. Reload the browser (hard refresh: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>)
+
+### Manual
+
+1. Download `stack-in-card.js` from the [latest release][release-url] (or from `dist/stack-in-card.js` on master) and place it in `config/www/`.
+2. Add to your Lovelace resources:
 
 ```yaml
 resources:
-  url: /local/stack-in-card.js
-  type: module
+  - url: /local/stack-in-card.js?v=1
+    type: module
 ```
 
-[commits-shield]: https://img.shields.io/github/commit-activity/y/custom-cards/stack-in-card.svg?style=for-the-badge
-[commits]: https://github.com/custom-cards/stack-in-card/commits/master
-[devcontainer]: https://code.visualstudio.com/docs/remote/containers
-[discord]: https://discord.gg/5e9yvq
-[discord-shield]: https://img.shields.io/discord/330944238910963714.svg?style=for-the-badge
-[forum-shield]: https://img.shields.io/badge/community-forum-brightgreen.svg?style=for-the-badge
-[forum]: https://community.home-assistant.io/t/stack-in-card-drop-in-replacement-for-vertical-stack-in-card/180072
-[license-shield]: https://img.shields.io/github/license/custom-cards/stack-in-card.svg?style=for-the-badge
-[maintenance-shield]: https://img.shields.io/maintenance/yes/2020.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/custom-cards/stack-in-card.svg?style=for-the-badge
-[releases]: https://github.com/custom-cards/stack-in-card/releases
+---
+
+## 🖱️ Visual Editor
+
+The card has a built-in visual editor accessible from the HA card picker. Most settings can be configured without YAML.
+
+### Sections
+
+| Section | What it does |
+|---|---|
+| **Title** | Optional header text rendered at the top of the stack |
+| **Mode** | `vertical` (default) or `horizontal` layout of the child cards |
+| **Keep options** | Toggle which visual properties of child cards to preserve (background, box-shadow, border-radius, margin between cards, outer padding) |
+| **Custom CSS — Stack card** | CSS code editor for the outer `<ha-card>` wrapper |
+| **Cards** | Tab strip + add (`+`) button; click `+` to open the embedded card picker |
+| **Per-card actions** | GUI/YAML toggle, move before, move after, copy, cut, delete — same as HA's own stack editor |
+| **Custom CSS — Card N** | CSS code editor for the currently selected child card (scoped to that child only) |
+
+> **Tip:** Cards copied or cut in any HA editor (this card, HA's built-in stack, etc.) appear as a **Paste from clipboard** entry at the top of the picker — they share the same `dashboardCardClipboard` sessionStorage slot.
+
+---
+
+## ⚙️ Configuration
+
+### All options
+
+| Name     | Type             | Required | Description                                                              | Default    |
+| -------- | ---------------- | -------- | ------------------------------------------------------------------------ | ---------- |
+| `type`   | string           | yes      | `custom:stack-in-card`                                                   |            |
+| `title`  | string           | no       | Header of the wrapper card                                               |            |
+| `mode`   | string           | no       | `vertical` or `horizontal`                                               | `vertical` |
+| `cards`  | array            | yes      | Child card configs (each may carry its own `styles` field)               | `[]`       |
+| `keep`   | object           | no       | See [keep object](#keep-object)                                          |            |
+| `styles` | string           | no       | CSS applied to the outer stack card (the `ha-card` wrapper)              |            |
+
+### Keep object
+
+| Name            | Type    | Description                                                                                                                                | Default                                       |
+| --------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| `background`    | boolean | Keep the background on **all** child cards. To keep it only on specific ones, set the CSS variable `--keep-background: 'true'` on that card. | `false`                                       |
+| `box_shadow`    | boolean | Keep the `box-shadow` on **all** child cards.                                                                                              | `false`                                       |
+| `margin`        | boolean | Keep the `margin` between **all** child cards.                                                                                             | `false`                                       |
+| `outer_padding` | boolean | Add `8px` padding around the inner stack when margin is kept.                                                                              | `true` if `margin` is `true`, otherwise `false` |
+| `border_radius` | boolean | Keep the `border-radius` on **all** child cards.                                                                                           | `false`                                       |
+
+---
+
+## 🎨 Custom CSS
+
+Two levels:
+
+### Stack-card CSS
+
+Lives at the top level of the config as `styles`. Applied to the outer `<ha-card>` wrapper itself.
+
+```yaml
+type: custom:stack-in-card
+styles: |
+  ha-card {
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  }
+cards:
+  - type: entities
+    entities: [sun.sun]
+```
+
+### Per-child CSS
+
+Lives on each child's own config as `styles`. Injected into that child's shadow DOM only — doesn't leak to siblings.
+
+```yaml
+type: custom:stack-in-card
+cards:
+  - type: button
+    entity: sun.sun
+    styles: |
+      ha-card {
+        background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%) !important;
+      }
+  - type: button
+    entity: sun.sun
+    styles: |
+      ha-card {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
+      }
+```
+
+Because per-child CSS lives on the child config, it travels with the card across reorder / copy / paste. No parallel index array to keep in sync.
+
+### Tips
+
+- `background` needs `!important` to override HA's `--ha-card-background` theme variable. `border-radius`, `box-shadow`, and most other properties usually don't.
+- The visual editor's CSS editors use `mode="yaml"` because HA's `<ha-code-editor>` doesn't ship a CSS mode. Highlighting won't perfectly match CSS, but everything works.
+- Prefer HA's CSS variables (`--primary-color`, `--card-background-color`, etc.) so your stack respects the active theme.
+
+#### Keep the background of one specific child
+
+Useful for `button-card`, which colours its own `ha-card`:
+
+```yaml
+type: custom:stack-in-card
+mode: vertical
+cards:
+  - type: custom:button-card
+    entity: sun.sun
+    color_type: card
+    styles:
+      card:
+        - --keep-background: 'true'
+```
+
+The `--keep-background` CSS variable is read by the stack itself before deciding whether to strip the child's background.
+
+---
+
+## ✨ Examples
+
+### Sunset card
+
+```yaml
+type: custom:stack-in-card
+mode: vertical
+styles: |
+  ha-card {
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(255, 94, 98, 0.4);
+  }
+cards:
+  - type: entities
+    entities:
+      - sun.sun
+    styles: |
+      ha-card {
+        background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%) !important;
+        color: white !important;
+      }
+```
+
+### Glassmorphism
+
+```yaml
+type: custom:stack-in-card
+styles: |
+  ha-card {
+    background: rgba(255, 255, 255, 0.08) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    border-radius: 16px;
+  }
+cards:
+  - type: entities
+    entities:
+      - sun.sun
+```
+
+---
+
+## 🔄 Migration from the original `stack-in-card`
+
+All `0.2.x` YAML configurations continue to work unchanged. The only addition is the optional `styles` field — either on the top-level config (for the stack card) or on individual child configs.
+
+Behavioural differences worth knowing:
+- The editor is now visual by default — the **+** button opens HA's embedded card picker rather than requiring YAML edits.
+- An empty `cards: []` is now a valid config (renders an empty-state placeholder); the original threw on this.
+- Per-child styles live on each child's config (`cards[i].styles`), not on a separate index-keyed array.
+
+---
+
+## 🧰 Development
+
+```bash
+npm install
+npm run dev        # rollup watch
+npm run build      # production build → dist/stack-in-card.js
+npm run typecheck
+```
+
+Build output is a single ES module at `dist/stack-in-card.js` (~48 KB minified).
+
+---
+
+[hacs-badge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
+[hacs-url]: https://github.com/custom-components/hacs
+[ha-badge]: https://img.shields.io/badge/Home%20Assistant-2025.1%2B-blue?style=for-the-badge&logo=home-assistant
+[ha-url]: https://www.home-assistant.io/
+[version-badge]: https://img.shields.io/github/v/release/duczz/ha-stack-in-card.svg?style=for-the-badge
+[downloads-badge]: https://img.shields.io/github/downloads/duczz/ha-stack-in-card/total.svg?style=for-the-badge
+[release-url]: https://github.com/duczz/ha-stack-in-card/releases
+[license-badge]: https://img.shields.io/github/license/duczz/ha-stack-in-card.svg?style=for-the-badge

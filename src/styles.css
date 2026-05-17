@@ -1,0 +1,268 @@
+:host {
+  --sic-default-gap: 8px;
+}
+
+.card-config {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-config ha-form {
+  display: block;
+}
+
+.section-label {
+  font-size: var(--ha-font-size-s, 12px);
+  font-weight: 500;
+  color: var(--secondary-text-color);
+  margin: 12px 0 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.styles-hint {
+  font-size: var(--ha-font-size-s, 12px);
+  color: var(--secondary-text-color);
+  margin: 4px 0 8px;
+}
+
+.styles-hint code {
+  font-family: var(--code-font-family, monospace);
+  background: var(--secondary-background-color);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.panel-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 8px 12px;
+}
+
+.styles-editor {
+  border: 1px solid var(--divider-color, #e0e0e0);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--code-editor-background-color, var(--card-background-color));
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+}
+
+.styles-editor ha-code-editor {
+  display: block;
+  flex: 1;
+  --code-mirror-max-height: 360px;
+}
+
+/* ----------------------------- Tab bar -------------------------------- */
+
+/* Row that holds the native ha-tab-group (or fallback) plus the add button */
+.tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--divider-color, #e0e0e0);
+  margin-bottom: 8px;
+}
+
+.tabs {
+  flex: 1;
+  min-width: 0;
+  --ha-tab-track-color: var(--card-background-color);
+}
+
+.tabs__add {
+  flex: 0 0 auto;
+}
+
+/* --- Fallback button-based tabs (used when ha-tab-group isn't defined) --- */
+
+.tab-bar--fallback {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 16px;
+  border: 1px solid var(--divider-color, #e0e0e0);
+  background: var(--secondary-background-color);
+  color: var(--secondary-text-color);
+  cursor: pointer;
+  font-size: var(--ha-font-size-m, 14px);
+  font-weight: 500;
+  transition: background-color 150ms ease, color 150ms ease, transform 100ms ease;
+  user-select: none;
+}
+
+.tab:hover {
+  color: var(--primary-text-color);
+}
+
+.tab:active {
+  transform: scale(0.95);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.tab--active {
+  background: var(--primary-color);
+  color: var(--text-primary-color, #fff);
+  border-color: var(--primary-color);
+}
+
+/* ----------------------------- Child actions row ---------------------- */
+
+.child-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0 8px;
+}
+
+.child-actions__spacer {
+  flex: 1;
+}
+
+.child-actions ha-icon-button[disabled] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ----------------------------- Child editor host ---------------------- */
+
+.child-editor {
+  border: 1px solid var(--divider-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--card-background-color);
+}
+
+hui-card-element-editor {
+  display: block;
+}
+
+/* ----------------------------- Embedded card picker ------------------- */
+
+.picker-wrapper {
+  border: 1px solid var(--divider-color, #e0e0e0);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--card-background-color);
+}
+
+.picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 8px;
+  font-weight: 500;
+  color: var(--primary-text-color);
+  border-bottom: 1px solid var(--divider-color, #e0e0e0);
+  margin-bottom: 8px;
+}
+
+hui-card-picker {
+  display: block;
+}
+
+.paste-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px dashed var(--divider-color, #e0e0e0);
+  border-radius: 8px;
+  background: var(--secondary-background-color);
+  color: var(--primary-text-color);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.paste-entry:hover {
+  background: var(--card-background-color);
+  border-color: var(--primary-color);
+  border-style: solid;
+}
+
+.paste-entry:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.paste-entry__icon {
+  --mdc-icon-size: 24px;
+  color: var(--primary-color);
+  flex: 0 0 auto;
+}
+
+.paste-entry__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.paste-entry__title {
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.paste-entry__sub {
+  font-size: var(--ha-font-size-s, 12px);
+  color: var(--secondary-text-color);
+}
+
+/* ----------------------------- Loading placeholder -------------------- */
+
+.styles-editor--loading {
+  align-items: center;
+  justify-content: center;
+  color: var(--secondary-text-color);
+  font-size: var(--ha-font-size-s, 12px);
+  font-style: italic;
+}
+
+/* ----------------------------- Footer --------------------------------- */
+
+.editor-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0 4px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--divider-color, #e0e0e0);
+  margin-top: 8px;
+}
+
+.editor-footer__hint {
+  font-size: var(--ha-font-size-s, 12px);
+  color: var(--secondary-text-color);
+}
+
+.editor-footer__version {
+  font-size: var(--ha-font-size-s, 12px);
+  color: var(--disabled-text-color);
+  margin-left: auto;
+}
+
+ha-expansion-panel {
+  --expansion-panel-summary-padding: 0 12px;
+  --expansion-panel-content-padding: 0 8px;
+}

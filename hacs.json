@@ -1,5 +1,6 @@
 {
-    "name": "Stack In Card",
-    "render_readme": true,
-    "filename": "stack-in-card.js"
+  "name": "Stack In Card",
+  "render_readme": true,
+  "filename": "stack-in-card.js",
+  "homeassistant": "2025.1.0"
 }

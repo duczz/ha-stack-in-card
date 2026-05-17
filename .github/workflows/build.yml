@@ -1,20 +1,42 @@
-name: "Build"
+name: Build
 
 on:
   push:
     branches:
       - master
-  pull_request:
-    branches:
-      - master
+      - main
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Test build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Build
+        run: npm run build
+
+      - name: Commit dist
         run: |
-          yarn install
-          npm run build
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dist/stack-in-card.js
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: build dist [skip ci]"
+            git push
+          fi
