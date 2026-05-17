@@ -392,9 +392,16 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
     const cards = [...(this._config.cards ?? []), card];
     this._config = { ...this._config, cards };
     this._selectedChild = cards.length - 1;
-    this._showPicker = false;
     this._keys.clear();
     this._fireConfigChanged(this._config);
+    // Defer hiding the picker until after the current Lit update cycle
+    // finishes. Synchronously toggling `_showPicker = false` here unmounts
+    // <hui-card-picker> while its own `updated()` pass is still running —
+    // the picker then dereferences a now-null shadowRoot at
+    // hui-card-picker.ts:286 and the whole event handler aborts.
+    requestAnimationFrame(() => {
+      this._showPicker = false;
+    });
   }
 
   private _handlePasteClipboard = () => {

@@ -56,6 +56,12 @@ Matches HA's own stack-card editor 1:1:
 - 🧹 **Cleanup on disconnect** — animation frames, mutation observer, and card promise all torn down in `disconnectedCallback`
 - 🔍 **`customCards.type` without `custom:` prefix** — HA's picker calls `document.createElement(type)` on this value; the prefix would fail silently and hang the preview tile
 
+### Performance & stability
+- 🚦 **Mutation-burst debounce** — live-updating children (`history-graph`, `mini-graph-card`, animations) no longer pin the main thread on repeated style re-walks; bursts are coalesced into a single pass every ~150 ms
+- 🎯 **Mutation filter** — observer ignores text / attribute changes and only reacts to actual element insertions
+- ⏱️ **CSS-injection retry cap tightened** — 3 × 200 ms instead of 10 × 500 ms; stuck children no longer spam `walkShadowAndLight` for 5 seconds
+- 🪟 **Picker null-deref fix** — `<hui-card-picker>` is now unmounted on the next animation frame after a pick, so its own `updated()` pass finishes cleanly (no more `getElementById on null` at `hui-card-picker.ts:286`)
+
 ### CI / packaging
 - 📦 **`dist/stack-in-card.js` shipped in master** — HACS finds the built file directly, no manual release required for installation
 - 🤖 **Auto-build on push** — `.github/workflows/build.yml` typechecks, builds, and commits `dist/` back to master

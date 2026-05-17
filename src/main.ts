@@ -25,7 +25,8 @@ export default class StackInCard extends LitElement implements LovelaceCard {
 
   private _hass?: HASS;
   private _cardPromise?: Promise<LovelaceCard>;
-  private _styleApplyHandle: ReturnType<typeof requestAnimationFrame> | null = null;
+  private _styleApplyRafHandle: ReturnType<typeof requestAnimationFrame> | null = null;
+  private _styleApplyTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
   private _childObserver?: MutationObserver;
   // Monotonic counter so out-of-order async createStack() calls cannot
   // overwrite a newer _card with an older one (rapid setConfig from the editor).
@@ -123,8 +124,14 @@ export default class StackInCard extends LitElement implements LovelaceCard {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    cancelAnimationFrame(this._styleApplyHandle ?? 0);
-    this._styleApplyHandle = null;
+    if (this._styleApplyRafHandle !== null) {
+      cancelAnimationFrame(this._styleApplyRafHandle);
+      this._styleApplyRafHandle = null;
+    }
+    if (this._styleApplyTimeoutHandle !== null) {
+      clearTimeout(this._styleApplyTimeoutHandle);
+      this._styleApplyTimeoutHandle = null;
+    }
     this._childObserver?.disconnect();
     this._childObserver = undefined;
     this._cardPromise = undefined;
@@ -140,14 +147,34 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     this._scheduleStyleApplication();
   }
 
-  private _scheduleStyleApplication(): void {
-    if (this._styleApplyHandle !== null) {
-      cancelAnimationFrame(this._styleApplyHandle);
+  // Bursty mutations (live-updating children like history-graph / mini-graph-card)
+  // get coalesced via a setTimeout debounce; "real" updates (new _card or
+  // _config) go through rAF only for a snappy first paint.
+  private static readonly _MUTATION_DEBOUNCE_MS = 150;
+
+  private _scheduleStyleApplication(fromMutation = false): void {
+    if (this._styleApplyRafHandle !== null) {
+      cancelAnimationFrame(this._styleApplyRafHandle);
+      this._styleApplyRafHandle = null;
     }
-    this._styleApplyHandle = requestAnimationFrame(() => {
-      this._styleApplyHandle = null;
-      this._applyAllStyles();
-    });
+    if (this._styleApplyTimeoutHandle !== null) {
+      clearTimeout(this._styleApplyTimeoutHandle);
+      this._styleApplyTimeoutHandle = null;
+    }
+    const runRaf = () => {
+      this._styleApplyRafHandle = requestAnimationFrame(() => {
+        this._styleApplyRafHandle = null;
+        this._applyAllStyles();
+      });
+    };
+    if (fromMutation) {
+      this._styleApplyTimeoutHandle = setTimeout(() => {
+        this._styleApplyTimeoutHandle = null;
+        runRaf();
+      }, StackInCard._MUTATION_DEBOUNCE_MS);
+    } else {
+      runRaf();
+    }
   }
 
   private async _applyAllStyles(): Promise<void> {
@@ -186,9 +213,21 @@ export default class StackInCard extends LitElement implements LovelaceCard {
   private _ensureChildObserver(): void {
     if (this._childObserver || !this._card) return;
     const root = this._card.shadowRoot ?? this._card;
-    this._childObserver = new MutationObserver(() => {
-      // Coalesce bursts of mutations
-      this._scheduleStyleApplication();
+    this._childObserver = new MutationObserver((mutations) => {
+      // Only react to mutations that add *element* nodes. Live-updating
+      // children (history-graph, mini-graph-card, animations) fire dozens
+      // of mutations per second; most are text / attribute changes that
+      // cannot introduce a new ha-card to strip. Filtering them out keeps
+      // us from re-walking the whole subtree on every animation frame.
+      for (const m of mutations) {
+        if (m.type !== 'childList') continue;
+        for (let i = 0; i < m.addedNodes.length; i++) {
+          if (m.addedNodes[i].nodeType === Node.ELEMENT_NODE) {
+            this._scheduleStyleApplication(true);
+            return;
+          }
+        }
+      }
     });
     this._childObserver.observe(root, { childList: true, subtree: true });
   }
@@ -410,9 +449,15 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     });
 
     // Retry if no shadow root has mounted yet (mushroom/button-card mount
-    // their internal ha-card asynchronously).
-    if (!foundShadow && attempt < 10) {
-      setTimeout(() => this._applyChildCss(child, cssText, attempt + 1), 500);
+    // their internal ha-card asynchronously). Capped tight: 3× 200 ms (= 600 ms
+    // total) covers every card I've tested. The old 10× 500 ms (= 5 s) loop
+    // would keep spamming `walkShadowAndLight` long after a stuck card had
+    // given up, masking real perf issues.
+    if (!foundShadow && attempt < 3) {
+      setTimeout(() => {
+        if (!this.isConnected) return;
+        this._applyChildCss(child, cssText, attempt + 1);
+      }, 200);
     }
   }
 
