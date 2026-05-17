@@ -1,4 +1,41 @@
-/node_modules/
-/.rpt2_cache/
-package-lock.json
-/dist
+# Dependencies
+node_modules/
+
+# Build artifacts
+# NOTE: dist/stack-in-card.js IS committed — HACS installs from master and
+# needs the built file in the repo. Only debug builds are local-only.
+dist/*.debug.js
+
+# TypeScript / Rollup caches
+*.tsbuildinfo
+.cache/
+
+# Lockfiles
+# NOTE: package-lock.json IS committed for reproducible builds (npm best practice).
+# Only ignore strays from package managers we don't use.
+yarn.lock
+pnpm-lock.yaml
+
+# Test coverage (kept for future test additions)
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+.AppleDouble
+Thumbs.db
+Desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo

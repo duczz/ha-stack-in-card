@@ -1,44 +1,60 @@
-import typescript from 'rollup-plugin-typescript2';
-import commonjs from '@rollup/plugin-commonjs';
-import nodeResolve from '@rollup/plugin-node-resolve';
-import babel from '@rollup/plugin-babel';
-import { terser } from 'rollup-plugin-terser';
-import serve from 'rollup-plugin-serve';
+import resolve from '@rollup/plugin-node-resolve';
+import typescript from '@rollup/plugin-typescript';
 import json from '@rollup/plugin-json';
+import terser from '@rollup/plugin-terser';
+import commonjs from '@rollup/plugin-commonjs';
+import postCSS from 'rollup-plugin-postcss';
+import postCSSLit from 'rollup-plugin-postcss-lit';
+import postCSSPresetEnv from 'postcss-preset-env';
+import inject from 'rollup-plugin-inject-process-env';
 
-const dev = process.env.ROLLUP_WATCH;
-
-const serveopts = {
-  contentBase: ['./dist'],
-  host: '0.0.0.0',
-  port: 5000,
-  allowCrossOrigin: true,
-  headers: {
-    'Access-Control-Allow-Origin': '*',
-  },
-};
+const dev = !!process.env.ROLLUP_WATCH;
 
 const plugins = [
-  nodeResolve({}),
+  resolve({ browser: true }),
   commonjs(),
-  typescript(),
   json(),
-  babel({
-    exclude: 'node_modules/**',
-    babelHelpers: 'bundled',
+  inject(
+    {
+      DEBUG: dev,
+      BUILD_TIME: new Date().toLocaleString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    },
+    { exclude: '**/*.css' },
+  ),
+  typescript({ sourceMap: dev, inlineSources: dev }),
+  postCSS({
+    plugins: [
+      postCSSPresetEnv({
+        stage: 1,
+        features: {
+          'nesting-rules': true,
+          'custom-media-queries': true,
+        },
+      }),
+    ],
+    inject: true,
+    extract: false,
   }),
-  dev && serve(serveopts),
-  !dev && terser(),
+  postCSSLit(),
 ];
 
 export default [
   {
     input: 'src/stack-in-card.ts',
     output: {
-      dir: './dist',
+      file: 'dist/stack-in-card.js',
       format: 'es',
-      sourcemap: dev ? true : false,
+      sourcemap: dev ? 'inline' : false,
+      inlineDynamicImports: true,
     },
-    plugins: [...plugins],
+    plugins: dev
+      ? plugins
+      : [...plugins, terser({ format: { comments: false } })],
   },
 ];

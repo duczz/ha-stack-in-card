@@ -1,22 +1,24 @@
 {
   "compilerOptions": {
-    "target": "es2017",
-    "module": "esnext",
+    "target": "ES2021",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ES2020",
     "moduleResolution": "node",
-    "lib": [
-      "es2017",
-      "dom",
-      "dom.iterable"
-    ],
-    "noEmit": true,
-    "noUnusedParameters": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "strict": true,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "noUnusedParameters": false,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "strict": true,
-    "noImplicitAny": false,
     "skipLibCheck": true,
-    "resolveJsonModule": true,
     "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "rootDir": "./src",
+    "outDir": "./dist",
     "sourceMap": true
-  }
+  },
+  "include": ["./src"]
 }
