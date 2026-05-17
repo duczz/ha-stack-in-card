@@ -107,6 +107,34 @@ minified) — HACS install paths are unchanged.
 - **`outer_padding` tautology cleanup** — `outer_padding ?? (margin ?
   true : false)` → `outer_padding ?? !!margin`
 
+### 🚀 Performance & stability
+
+- **Mutation bursts debounced** — `MutationObserver` callbacks from
+  live-updating children (`history-graph`, `mini-graph-card`,
+  animations) used to schedule a full style re-walk per mutation,
+  with only `requestAnimationFrame` debouncing. A history-graph
+  card refreshing several times a second could pin the main thread
+  re-walking the whole subtree. Bursts are now collapsed via an
+  additional 150 ms `setTimeout` debounce; "real" updates from
+  `_card` / `_config` changes still go through rAF only for snappy
+  first paint.
+- **Mutation filter on element nodes only** — observer callback now
+  short-circuits on the first added element node and ignores text /
+  comment / attribute mutations. Eliminates the long tail of "tens of
+  mutations per second, none of them introduce a new `ha-card`" wakeups.
+- **CSS-injection retry cap tightened** — the per-child CSS injection
+  fallback used to retry up to 10 times at 500 ms (= 5 s of repeated
+  `walkShadowAndLight` calls) when no shadow root had mounted yet.
+  Capped to 3 × 200 ms and guarded with `isConnected`, so a stuck
+  card can no longer spam `walkShadowAndLight` long after it gave up.
+- **Picker null-deref fix** — `_appendCard` used to flip
+  `_showPicker = false` synchronously inside the click handler, which
+  unmounted `<hui-card-picker>` while its own `updated()` pass was
+  still running, triggering a `Cannot read properties of null
+  (getElementById)` deref at `hui-card-picker.ts:286`. The unmount
+  is now deferred via `requestAnimationFrame` so the picker can
+  finish its own update cycle first.
+
 ### 🏗 CI / packaging
 
 - **HACS-compliant repo layout** — `dist/stack-in-card.js` is committed
