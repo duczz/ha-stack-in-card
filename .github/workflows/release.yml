@@ -26,8 +26,30 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Extract changelog section for this tag
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "Extracting CHANGELOG section for v$VERSION..."
+          awk -v ver="$VERSION" '
+            BEGIN { capture = 0 }
+            /^## \[/ {
+              if (capture) { exit }
+              if (index($0, "[" ver "]")) { capture = 1; next }
+            }
+            capture { print }
+          ' CHANGELOG.md > release-body.md
+          if [ ! -s release-body.md ]; then
+            echo "No CHANGELOG entry found for v$VERSION — falling back to auto-generated notes."
+            rm release-body.md
+          else
+            echo "::group::Release body"
+            cat release-body.md
+            echo "::endgroup::"
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/stack-in-card.js
-          generate_release_notes: true
+          body_path: ${{ hashFiles('release-body.md') != '' && 'release-body.md' || '' }}
+          generate_release_notes: ${{ hashFiles('release-body.md') == '' }}
