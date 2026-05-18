@@ -10,8 +10,11 @@ frontend stack (HA 2025.1+), with a HA-native visual editor and per-card
 custom CSS support.
 
 > Existing YAML configurations from `0.2.x` continue to work unchanged.
-> The only addition is the optional `styles` field — either at the top
-> level (for the outer "stack card") or on each child card.
+> The only addition is the optional `stack_in_card_styles` field — either
+> at the top level (for the outer "stack card") or on each child card.
+> The field is namespaced to avoid clashing with cards like `bubble-card`
+> and `button-card` that use a plain `styles:` key for their own styling
+> system.
 
 ### ✨ Highlights
 
@@ -35,14 +38,16 @@ custom CSS support.
   synchronously, so the picker preview tile never spins
 
 **Custom CSS support**
-- `styles` at the top level — CSS applied to the outer **stack card**
-  (the `ha-card` wrapper itself)
-- `styles` on each child card config — CSS injected into that child's
-  shadow DOM only, doesn't leak to sibling cards
+- `stack_in_card_styles` at the top level — CSS applied to the outer
+  **stack card** (the `ha-card` wrapper itself)
+- `stack_in_card_styles` on each child card config — CSS injected into
+  that child's shadow DOM only, doesn't leak to sibling cards
+- Namespaced field name avoids clashing with cards like `bubble-card` /
+  `button-card` that use a plain `styles:` key for their own styling
 - The visual editor exposes both via `<ha-code-editor mode="yaml">` with
   `autocomplete-entities` / `autocomplete-icons`
-- When a child is reordered, copied, or pasted, its `styles` field
-  travels with it — no parallel index array to keep in sync
+- When a child is reordered, copied, or pasted, its `stack_in_card_styles`
+  field travels with it — no parallel index array to keep in sync
 
 **Add-card flow**
 - `+` button opens the embedded `<hui-card-picker>` inline (HA's own
@@ -172,8 +177,13 @@ minified) — HACS install paths are unchanged.
 
 All `0.2.x` YAML configurations remain valid. New optional fields:
 
-- `styles` at the top of the config (string) → CSS for the outer stack
-- `styles` on individual `cards[i]` (string) → CSS for that child card
+- `stack_in_card_styles` at the top of the config (string) → CSS for the outer stack
+- `stack_in_card_styles` on individual `cards[i]` (string) → CSS for that child card
+
+The field name is namespaced (rather than plain `styles:`) to avoid
+clashing with cards that use `styles:` as their own configuration key —
+notably `bubble-card` (string-style CSS) and `button-card` (object-style
+sections like `card:`, `name:`, `icon:`).
 
 ### 📁 File layout
 

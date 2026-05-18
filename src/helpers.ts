@@ -39,8 +39,10 @@ export function deepClone<T>(value: T): T {
 }
 
 /** Stack-in-card-only fields that must not leak into child configs handed
- * off to HA's `createCardElement` or its built-in card editors. */
-const STACK_IN_CARD_ONLY_FIELDS = ['styles'] as const;
+ * off to HA's `createCardElement` or its built-in card editors. The field
+ * is namespaced (`stack_in_card_*`) to avoid clashing with cards like
+ * bubble-card / button-card that use their own `styles:` field. */
+const STACK_IN_CARD_ONLY_FIELDS = ['stack_in_card_styles'] as const;
 
 /** Strip stack-in-card-only fields from a child config. Used both by the
  * runtime (before handing children to HA's stack constructor) and by the

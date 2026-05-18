@@ -36,11 +36,14 @@ export interface KeepConfig {
 
 /**
  * Child card config: a regular Lovelace card config that may additionally
- * carry a `styles` string. The CSS in that string is injected into the
- * child card's shadow DOM only — it does not leak to sibling cards.
+ * carry a `stack_in_card_styles` string. The CSS in that string is injected
+ * into the child card's shadow DOM only — it does not leak to sibling cards.
+ *
+ * The field is namespaced (`stack_in_card_*`) to avoid clashing with cards
+ * like bubble-card or button-card that use their own `styles:` field.
  */
 export interface StackChildCardConfig extends LovelaceCardConfig {
-  styles?: string;
+  stack_in_card_styles?: string;
 }
 
 export interface StackInCardConfig extends LovelaceCardConfig {
@@ -50,5 +53,5 @@ export interface StackInCardConfig extends LovelaceCardConfig {
   title?: string;
   keep?: KeepConfig;
   /** CSS applied to the outer stack-in-card itself (the "mother" card). */
-  styles?: string;
+  stack_in_card_styles?: string;
 }

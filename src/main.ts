@@ -249,9 +249,9 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     }
 
     const stackType = `${this._config!.mode}-stack`;
-    // Strip our own `styles` field from each child config before handing it
-    // to HA's stack — HA's strict config validators would otherwise reject
-    // the unknown property on some card types.
+    // Strip our own `stack_in_card_styles` field from each child config
+    // before handing it to HA's stack — HA's strict config validators
+    // would otherwise reject the unknown property on some card types.
     const childConfigs = this._config!.cards.map(stripStackInCardFields);
     const promise = createCardElement(
       { type: stackType, cards: childConfigs },
@@ -384,7 +384,7 @@ export default class StackInCard extends LitElement implements LovelaceCard {
   private _injectMotherStyle(): void {
     if (!this.shadowRoot) return;
 
-    const css = this._config?.styles?.trim();
+    const css = this._config?.stack_in_card_styles?.trim();
 
     let tag = this.shadowRoot.getElementById(MOTHER_STYLE_TAG_ID) as HTMLStyleElement | null;
     if (!css) {
@@ -416,9 +416,9 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     const stackRoot = this._card.shadowRoot;
     if (!stackRoot) return;
 
-    // Per-child styles live on each child's config: `cards[i].styles`. This
-    // means the CSS travels with the card itself — reorder/copy/paste of a
-    // child preserves its styling without needing a parallel index array.
+    // Per-child styles live on each child's config: `cards[i].stack_in_card_styles`.
+    // This means the CSS travels with the card itself — reorder/copy/paste of
+    // a child preserves its styling without needing a parallel index array.
     const childConfigs = this._config?.cards ?? [];
 
     // The inner stack renders its children inside <div id="root">
@@ -427,7 +427,7 @@ export default class StackInCard extends LitElement implements LovelaceCard {
 
     const children = Array.from(root.children) as HTMLElement[];
     children.forEach((child, index) => {
-      const cssText = childConfigs[index]?.styles?.trim();
+      const cssText = childConfigs[index]?.stack_in_card_styles?.trim();
       this._applyChildCss(child, cssText, 0);
     });
   }

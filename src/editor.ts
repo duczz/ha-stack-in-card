@@ -230,19 +230,20 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
 
   /* ------------------------------- styles ----------------------------------- */
 
-  // Mother CSS lives directly on `_config.styles` as a plain string.
+  // Mother CSS lives directly on `_config.stack_in_card_styles` as a plain string.
   private _motherStyleChanged = (ev: CustomEvent) => {
     if (!this._config) return;
     ev.stopPropagation();
     const value = (((ev.detail as any)?.value ?? '') as string).trim();
     const copy = deepClone(this._config) as StackInCardConfig;
-    if (value) copy.styles = value;
-    else delete (copy as any).styles;
+    if (value) copy.stack_in_card_styles = value;
+    else delete (copy as any).stack_in_card_styles;
     this._fireConfigChanged(copy);
   };
 
-  // Per-child CSS lives at `cards[i].styles`. The CSS travels with the
-  // child card itself, so reorder/copy/paste preserves it automatically.
+  // Per-child CSS lives at `cards[i].stack_in_card_styles`. The CSS travels
+  // with the child card itself, so reorder/copy/paste preserves it
+  // automatically.
   private _selectedChildStyleChanged = (ev: CustomEvent) => {
     if (!this._config || this._selectedChild === null) return;
     ev.stopPropagation();
@@ -251,8 +252,8 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
     const cards = (this._config.cards ?? []).slice();
     if (!cards[idx]) return;
     const child: StackChildCardConfig = { ...cards[idx] };
-    if (value) child.styles = value;
-    else delete child.styles;
+    if (value) child.stack_in_card_styles = value;
+    else delete child.stack_in_card_styles;
     cards[idx] = child;
     const copy = deepClone(this._config) as StackInCardConfig;
     copy.cards = cards;
@@ -304,8 +305,8 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
     if (target < 0 || target >= cards.length) return;
     const card = cards.splice(source, 1)[0];
     cards.splice(target, 0, card);
-    // Per-child styles live on `cards[i].styles`, so they move along with
-    // the card automatically.
+    // Per-child styles live on `cards[i].stack_in_card_styles`, so they move
+    // along with the card automatically.
     this._config = { ...this._config, cards };
     this._selectedChild = target;
     // Critical: invalidate the keyed() identity for the nested editor.
@@ -422,10 +423,13 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
     if (!newCardConfig) return;
     const idx = this._selectedChild;
     const previousChild = this._config.cards?.[idx];
-    // Preserve our `styles` field — HA's nested card editor strips unknown
-    // keys when it re-emits the child config, so we re-attach it ourselves.
+    // Preserve our `stack_in_card_styles` field — HA's nested card editor
+    // strips unknown keys when it re-emits the child config, so we re-attach
+    // it ourselves.
     const merged: StackChildCardConfig = { ...newCardConfig };
-    if (previousChild?.styles) merged.styles = previousChild.styles;
+    if (previousChild?.stack_in_card_styles) {
+      merged.stack_in_card_styles = previousChild.stack_in_card_styles;
+    }
     // Skip the round-trip when nothing changed. HA's nested editor sometimes
     // re-fires config-changed on focus/blur with an identical config, and
     // each fire would otherwise force a full inner-stack rebuild via the
@@ -517,14 +521,15 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
     if (!this.hass || !this._config) return html``;
 
     const data = this._buildFormData();
-    const motherCss = this._config.styles ?? '';
+    const motherCss = this._config.stack_in_card_styles ?? '';
     const cards = this._config.cards ?? [];
     const selected = this._selectedChild;
     const selectedCard =
       selected !== null && selected >= 0 && selected < cards.length ? cards[selected] : undefined;
-    const selectedChildCss = selectedCard?.styles ?? '';
-    // HA's <hui-card-element-editor> doesn't know about our `styles` field
-    // and would warn / strip it. Hand it a stripped copy.
+    const selectedChildCss = selectedCard?.stack_in_card_styles ?? '';
+    // HA's <hui-card-element-editor> doesn't know about our
+    // `stack_in_card_styles` field and would warn / strip it. Hand it a
+    // stripped copy.
     const selectedCardForEditor = selectedCard ? stripStackInCardFields(selectedCard) : undefined;
 
     return html`
