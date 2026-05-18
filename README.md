@@ -45,8 +45,9 @@ Matches HA's own stack-card editor 1:1:
 - 🪧 **Inline empty-state placeholder** — never a spinning preview in the picker
 
 ### Custom CSS
-- 🎨 **Top-level `styles`** — CSS applied to the outer **stack card** (`ha-card` wrapper)
-- 🎯 **Per-child `cards[i].styles`** — CSS injected into a single child's shadow DOM only (no leak to siblings)
+- 🎨 **Top-level `stack_in_card_styles`** — CSS applied to the outer **stack card** (`ha-card` wrapper)
+- 🎯 **Per-child `cards[i].stack_in_card_styles`** — CSS injected into a single child's shadow DOM only (no leak to siblings)
+- 🛡️ **Namespaced field name** — avoids clashing with cards like `bubble-card` / `button-card` that use their own `styles:` field
 - ✏️ Both edited via `<ha-code-editor>` with entity / icon autocompletion in the visual editor
 - 🧳 Per-child styles travel with the card across reorder / copy / paste
 
@@ -150,9 +151,9 @@ The card has a built-in visual editor accessible from the HA card picker. Most s
 | `type`   | string           | yes      | `custom:stack-in-card`                                                   |            |
 | `title`  | string           | no       | Header of the wrapper card                                               |            |
 | `mode`   | string           | no       | `vertical` or `horizontal`                                               | `vertical` |
-| `cards`  | array            | yes      | Child card configs (each may carry its own `styles` field)               | `[]`       |
+| `cards`  | array            | yes      | Child card configs (each may carry its own `stack_in_card_styles` field) | `[]`       |
 | `keep`   | object           | no       | See [keep object](#keep-object)                                          |            |
-| `styles` | string           | no       | CSS applied to the outer stack card (the `ha-card` wrapper)              |            |
+| `stack_in_card_styles` | string | no   | CSS applied to the outer stack card (the `ha-card` wrapper)              |            |
 
 ### Keep object
 
@@ -172,11 +173,11 @@ Two levels:
 
 ### Stack-card CSS
 
-Lives at the top level of the config as `styles`. Applied to the outer `<ha-card>` wrapper itself.
+Lives at the top level of the config as `stack_in_card_styles`. Applied to the outer `<ha-card>` wrapper itself.
 
 ```yaml
 type: custom:stack-in-card
-styles: |
+stack_in_card_styles: |
   ha-card {
     border-radius: 16px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
@@ -188,26 +189,28 @@ cards:
 
 ### Per-child CSS
 
-Lives on each child's own config as `styles`. Injected into that child's shadow DOM only — doesn't leak to siblings.
+Lives on each child's own config as `stack_in_card_styles`. Injected into that child's shadow DOM only — doesn't leak to siblings.
 
 ```yaml
 type: custom:stack-in-card
 cards:
   - type: button
     entity: sun.sun
-    styles: |
+    stack_in_card_styles: |
       ha-card {
         background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%) !important;
       }
   - type: button
     entity: sun.sun
-    styles: |
+    stack_in_card_styles: |
       ha-card {
         background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
       }
 ```
 
 Because per-child CSS lives on the child config, it travels with the card across reorder / copy / paste. No parallel index array to keep in sync.
+
+> 💡 **Why the long name?** A plain `styles:` would clash with cards like `bubble-card` and `button-card` that use the same key for their own styling system. The namespaced `stack_in_card_styles:` is unmistakably ours and lets both systems coexist on the same child.
 
 ### Tips
 
@@ -242,7 +245,7 @@ The `--keep-background` CSS variable is read by the stack itself before deciding
 ```yaml
 type: custom:stack-in-card
 mode: vertical
-styles: |
+stack_in_card_styles: |
   ha-card {
     border-radius: 20px;
     box-shadow: 0 8px 24px rgba(255, 94, 98, 0.4);
@@ -251,7 +254,7 @@ cards:
   - type: entities
     entities:
       - sun.sun
-    styles: |
+    stack_in_card_styles: |
       ha-card {
         background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%) !important;
         color: white !important;
@@ -262,7 +265,7 @@ cards:
 
 ```yaml
 type: custom:stack-in-card
-styles: |
+stack_in_card_styles: |
   ha-card {
     background: rgba(255, 255, 255, 0.08) !important;
     backdrop-filter: blur(20px);
@@ -280,12 +283,12 @@ cards:
 
 ## 🔄 Migration from the original `stack-in-card`
 
-All `0.2.x` YAML configurations continue to work unchanged. The only addition is the optional `styles` field — either on the top-level config (for the stack card) or on individual child configs.
+All `0.2.x` YAML configurations continue to work unchanged. The only addition is the optional `stack_in_card_styles` field — either on the top-level config (for the stack card) or on individual child configs.
 
 Behavioural differences worth knowing:
 - The editor is now visual by default — the **+** button opens HA's embedded card picker rather than requiring YAML edits.
 - An empty `cards: []` is now a valid config (renders an empty-state placeholder); the original threw on this.
-- Per-child styles live on each child's config (`cards[i].styles`), not on a separate index-keyed array.
+- Per-child styles live on each child's config (`cards[i].stack_in_card_styles`), not on a separate index-keyed array.
 
 ---
 
