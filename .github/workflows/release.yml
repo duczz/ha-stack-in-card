@@ -7,6 +7,10 @@ on:
   release:
     types: [published]
 
+concurrency:
+  group: repo-write
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Attach build asset and CHANGELOG body
