@@ -28,6 +28,10 @@ export default class StackInCard extends LitElement implements LovelaceCard {
   private _styleApplyRafHandle: ReturnType<typeof requestAnimationFrame> | null = null;
   private _styleApplyTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
   private _childObserver?: MutationObserver;
+  // Tracks pending _applyChildCss retry timeouts so they can be cancelled
+  // when the stack is rebuilt or the element is disconnected, preventing
+  // stale CSS injection into new or removed card structures.
+  private _retryTimeouts = new Set<ReturnType<typeof setTimeout>>();
   // Monotonic counter so out-of-order async createStack() calls cannot
   // overwrite a newer _card with an older one (rapid setConfig from the editor).
   private _stackGeneration = 0;
@@ -132,6 +136,9 @@ export default class StackInCard extends LitElement implements LovelaceCard {
       clearTimeout(this._styleApplyTimeoutHandle);
       this._styleApplyTimeoutHandle = null;
     }
+    // Cancel any pending _applyChildCss retries — the element is gone.
+    this._retryTimeouts.forEach((id) => clearTimeout(id));
+    this._retryTimeouts.clear();
     this._childObserver?.disconnect();
     this._childObserver = undefined;
     this._cardPromise = undefined;
@@ -222,7 +229,14 @@ export default class StackInCard extends LitElement implements LovelaceCard {
       for (const m of mutations) {
         if (m.type !== 'childList') continue;
         for (let i = 0; i < m.addedNodes.length; i++) {
-          if (m.addedNodes[i].nodeType === Node.ELEMENT_NODE) {
+          const node = m.addedNodes[i];
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Skip SVG-namespace elements — graphing cards (mini-graph-card,
+            // apexcharts-card, history-graph) mutate <path>, <animate> and
+            // other SVG children on every animation frame. SVG elements can
+            // never introduce a new ha-card that needs style-stripping, so
+            // reacting to them is pure overhead.
+            if ((node as Element).namespaceURI === 'http://www.w3.org/2000/svg') continue;
             this._scheduleStyleApplication(true);
             return;
           }
@@ -238,6 +252,10 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     // Tear down a previous observer before we swap the inner card out
     this._childObserver?.disconnect();
     this._childObserver = undefined;
+    // Cancel stale _applyChildCss retries from the previous stack — otherwise
+    // they would inject old CSS into the freshly rebuilt card structure.
+    this._retryTimeouts.forEach((id) => clearTimeout(id));
+    this._retryTimeouts.clear();
 
     // Empty cards: nothing to build. render() will draw the placeholder
     // synchronously. We still clear `_card` so a transition from "had
@@ -367,12 +385,17 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     if (!haCard) return;
     const keep = this._config?.keep ?? {};
     if (!keep.box_shadow) haCard.style.boxShadow = 'none';
-    if (
-      !keep.background &&
-      withBackground &&
-      getComputedStyle(haCard).getPropertyValue('--keep-background').trim() !== 'true'
-    ) {
-      haCard.style.background = 'transparent';
+    if (!keep.background && withBackground) {
+      // Opt-out check: a child card can signal that it wants to keep its
+      // background either via:
+      //   (a) data-keep-background="true"  — fast O(1) attribute lookup
+      //   (b) CSS custom property --keep-background: true  — requires
+      //       getComputedStyle (slower, but needed for cross-shadow-DOM CSS)
+      //       kept for backwards compatibility.
+      const keepBg =
+        haCard.dataset['keepBackground'] === 'true' ||
+        getComputedStyle(haCard).getPropertyValue('--keep-background').trim() === 'true';
+      if (!keepBg) haCard.style.background = 'transparent';
     }
     if (!keep.border_radius) haCard.style.borderRadius = '0';
   }
@@ -454,10 +477,12 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     // would keep spamming `walkShadowAndLight` long after a stuck card had
     // given up, masking real perf issues.
     if (!foundShadow && attempt < 3) {
-      setTimeout(() => {
+      const id = setTimeout(() => {
+        this._retryTimeouts.delete(id);
         if (!this.isConnected) return;
         this._applyChildCss(child, cssText, attempt + 1);
       }, 200);
+      this._retryTimeouts.add(id);
     }
   }
 

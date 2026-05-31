@@ -59,7 +59,10 @@ Matches HA's own stack-card editor 1:1:
 ### Performance & stability
 - 🚦 **Mutation-burst debounce** — live-updating children (`history-graph`, `mini-graph-card`, animations) no longer pin the main thread on repeated style re-walks; bursts are coalesced into a single pass every ~150 ms
 - 🎯 **Mutation filter** — observer ignores text / attribute changes and only reacts to actual element insertions
+- 🖼️ **SVG-namespace filter** — SVG child elements (`<path>`, `<animate>`, `<g>`, …) added by graphing cards (`mini-graph-card`, `apexcharts-card`) are excluded from the observer entirely; they can never introduce a new `ha-card` to strip, so reacting to them was pure overhead
+- 🌳 **Linear O(N) DOM walker** — `walkShadowAndLight` previously mixed `querySelectorAll('*')` with recursive child traversal, visiting shadow-DOM descendants once per ancestor level (quadratic growth). Now uses only direct `.children` per level with a visited guard; every node is touched exactly once
 - ⏱️ **CSS-injection retry cap tightened** — 3 × 200 ms instead of 10 × 500 ms; stuck children no longer spam `walkShadowAndLight` for 5 seconds
+- 🧹 **CSS-injection retry cancellation** — pending retries are cancelled when the stack is rebuilt or disconnected, preventing stale CSS from leaking into new card structures
 - 🪟 **Picker null-deref fix** — `<hui-card-picker>` is now unmounted on the next animation frame after a pick, so its own `updated()` pass finishes cleanly (no more `getElementById on null` at `hui-card-picker.ts:286`)
 
 ### CI / packaging
@@ -158,7 +161,7 @@ The card has a built-in visual editor accessible from the HA card picker. Most s
 
 | Name            | Type    | Description                                                                                                                                | Default                                       |
 | --------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| `background`    | boolean | Keep the background on **all** child cards. To keep it only on specific ones, set the CSS variable `--keep-background: 'true'` on that card. | `false`                                       |
+| `background`    | boolean | Keep the background on **all** child cards. To keep it only on specific ones, use `data-keep-background="true"` on that card's `ha-card` element (fast O(1) lookup), or set the CSS variable `--keep-background: 'true'` on that card (backwards-compatible, requires `getComputedStyle`). | `false`                                       |
 | `box_shadow`    | boolean | Keep the `box-shadow` on **all** child cards.                                                                                              | `false`                                       |
 | `margin`        | boolean | Keep the `margin` between **all** child cards.                                                                                             | `false`                                       |
 | `outer_padding` | boolean | Add `8px` padding around the inner stack when margin is kept.                                                                              | `true` if `margin` is `true`, otherwise `false` |
@@ -233,7 +236,7 @@ cards:
         - --keep-background: 'true'
 ```
 
-The `--keep-background` CSS variable is read by the stack itself before deciding whether to strip the child's background.
+The `--keep-background` CSS variable is read by the stack itself before deciding whether to strip the child's background. Alternatively, you can set `data-keep-background="true"` directly on the `ha-card` element — this is an O(1) attribute lookup and slightly faster than the CSS-variable path.
 
 ---
 

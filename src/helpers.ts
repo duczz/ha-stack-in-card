@@ -56,21 +56,37 @@ export function stripStackInCardFields(config: StackChildCardConfig): LovelaceCa
 /** Walk a DOM subtree visiting every element in both the light DOM and any
  * nested shadow roots. The visitor is called with each element node.
  * Used for both injection ("write a <style> into every shadow root") and
- * cleanup ("remove that <style> again"). */
+ * cleanup ("remove that <style> again").
+ *
+ * Each node is visited exactly once (O(N)). The previous implementation
+ * mixed `querySelectorAll('*')` (all descendants) with recursive
+ * `el.children` traversal, which caused every element inside a shadow root
+ * to be revisited N times (once per ancestor level) — a quadratic blowup
+ * on deeply nested custom cards like Mushroom or Bubble-Card. */
 export function walkShadowAndLight(
   element: HTMLElement,
   visitor: (node: HTMLElement | ShadowRoot) => void,
 ): void {
+  // Guard against cycles (e.g. open shadow roots that reference parents).
+  const visited = new Set<Element | ShadowRoot>();
+
   const visit = (el: any): void => {
-    if (!el) return;
-    if (el.shadowRoot) {
+    if (!el || visited.has(el)) return;
+    visited.add(el);
+
+    if (el.shadowRoot && !visited.has(el.shadowRoot)) {
+      visited.add(el.shadowRoot);
       visitor(el.shadowRoot);
-      el.shadowRoot.querySelectorAll('*').forEach((c: any) => visit(c));
+      // Traverse only the *direct* children of the shadow root — the
+      // recursion takes care of deeper levels, one level at a time.
+      Array.from(el.shadowRoot.children).forEach((c) => visit(c as HTMLElement));
     }
+
     if (el.children) {
       Array.from(el.children).forEach((c) => visit(c as HTMLElement));
     }
   };
+
   visitor(element);
   visit(element);
 }
