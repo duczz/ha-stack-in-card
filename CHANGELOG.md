@@ -2,6 +2,46 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.0.1] — 2026-05-31
+
+### 🚀 Performance fixes
+
+- **SVG-namespace filter on `MutationObserver`** (`main.ts`) — graphing
+  cards such as `mini-graph-card` (with `animate: true`), `apexcharts-card`
+  and `history-graph` mutate SVG children (`<path>`, `<animate>`, `<g>`, …)
+  on every animation frame. These elements are `ELEMENT_NODE`s and therefore
+  previously slipped past the observer's node-type filter, triggering a
+  full style re-walk up to ~7 times per second even when no real card
+  structure had changed. The observer now skips any added node whose
+  `namespaceURI` is `http://www.w3.org/2000/svg`. SVG elements can never
+  carry an `ha-card` that needs style-stripping, so skipping them is always
+  safe.
+
+- **Linear O(N) tree-walker in `walkShadowAndLight`** (`helpers.ts`) — the
+  previous implementation combined `querySelectorAll('*')` (which returns
+  *all* descendants) with a recursive `el.children` traversal. Each element
+  inside a shadow root was therefore visited once for every ancestor level
+  above it (quadratic growth). On deeply nested cards like Mushroom,
+  Bubble-Card or multiple-entity-row, this produced hundreds of redundant
+  DOM accesses per style pass. The function now uses only direct `.children`
+  at each level with a `Set`-based visited guard; every node is visited
+  exactly once.
+
+- **`getComputedStyle` fast-path** (`main.ts`) — the per-child-card
+  background opt-out check now first tests `haCard.dataset.keepBackground ===
+  'true'` (O(1) attribute lookup) before falling back to the existing
+  `getComputedStyle(haCard).getPropertyValue('--keep-background')` call.
+  The CSS-custom-property path is kept for full backwards compatibility; the
+  new `data-keep-background="true"` attribute is the preferred zero-cost
+  alternative for card authors.
+
+- **CSS-injection retry cancellation** (`main.ts`) — pending `_applyChildCss`
+  retry timeouts are now tracked in a `Set<ReturnType<typeof setTimeout>>`
+  (`_retryTimeouts`) on the class. All outstanding retries are cancelled in
+  both `disconnectedCallback` and at the start of `_createStack`, preventing
+  stale CSS injection into newly rebuilt or removed card structures when
+  the user edits YAML quickly in the Lovelace editor.
+
 ## [2.0.0] — 2026-05-17
 
 First stable release of the modernised Stack In Card — a complete rewrite
@@ -217,5 +257,6 @@ upstream
 repository for the pre-2026 history.
 
 [@RomRider]: https://github.com/RomRider
+[2.0.1]: https://github.com/duczz/ha-stack-in-card/releases/tag/v2.0.1
 [2.0.0]: https://github.com/duczz/ha-stack-in-card/releases/tag/v2.0.0
 [0.2.0]: https://github.com/custom-cards/stack-in-card/releases/tag/v0.2.0
