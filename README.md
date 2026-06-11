@@ -7,7 +7,6 @@
 [![HACS][hacs-badge]][hacs-url]
 [![Home Assistant][ha-badge]][ha-url]
 [![Version][version-badge]][release-url]
-[![Downloads][downloads-badge]][release-url]
 
 [![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=duczz&repository=ha-stack-in-card&category=dashboard)
 
@@ -312,6 +311,5 @@ Build output is a single ES module at `dist/stack-in-card.js` (~48 KB minified).
 [ha-badge]: https://img.shields.io/badge/Home%20Assistant-2025.1%2B-blue?style=for-the-badge&logo=home-assistant
 [ha-url]: https://www.home-assistant.io/
 [version-badge]: https://img.shields.io/github/v/release/duczz/ha-stack-in-card.svg?style=for-the-badge
-[downloads-badge]: https://img.shields.io/github/downloads/duczz/ha-stack-in-card/total.svg?style=for-the-badge
 [release-url]: https://github.com/duczz/ha-stack-in-card/releases
 [license-badge]: https://img.shields.io/github/license/duczz/ha-stack-in-card.svg?style=for-the-badge
