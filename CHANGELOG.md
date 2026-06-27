@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.0.2] — 2026-06-27
+
+### ✨ Features
+
+- **Editor:** Added Material Design icons (`mdiTune`, `mdiCodeBraces`) to the "Keep options" and "Custom CSS" expandable sections in the visual editor, matching standard Home Assistant UI patterns.
+
+### 🐛 Bug Fixes
+
+- **Editor:** Fixed a bug where `keep.outer_padding` could not be disabled when `keep.margin` was active. The editor now explicitly saves `false` for this property instead of deleting the key, preventing the runtime backwards-compatibility fallback from incorrectly forcing it back to `true`.
+
 ## [2.0.1] — 2026-05-31
 
 ### 🚀 Performance fixes
