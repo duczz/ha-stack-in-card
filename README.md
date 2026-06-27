@@ -27,51 +27,6 @@ seamless card — without inner borders, shadows or padding gaps. Includes a
 This project is a modernised complete rewrite of the 2020-era `custom-cards/stack-in-card`, rebuilt to support the latest Home Assistant frontend stack (HA 2025.1+).
 For all new features, bug fixes, and improvements, please check the [CHANGELOG.md](CHANGELOG.md).
 
-### Modernisation
-- ⚡ **Lit 3 + TypeScript 5.7 + Rollup 4** — full migration from Lit-element 2 / TS 4 / Rollup 2
-- 📦 **No `custom-card-helpers`** — local types, modern HA `loadCardHelpers()`-only path
-- 👀 **Style-application via `MutationObserver`** — replaces the fragile `setTimeout(500)` of the original; late-mounted nested cards (e.g. `mushroom`, `button-card`) get their styles applied as they mount
-- 🏁 **Race-condition guarded** — monotonic generation counter on async stack creation; rapid config updates from the editor can no longer overwrite each other
-
-### Visual editor (new in v2)
-Matches HA's own stack-card editor 1:1:
-- 🗂️ **Native `<ha-tab-group>` tabs** for switching between child cards (falls back to styled buttons on HA versions without it)
-- 🎛️ **Action row** — GUI/YAML toggle, RTL-aware move-before / move-after, copy, cut, delete (same icons + German translations as HA's built-in editor)
-- ➕ **Embedded `<hui-card-picker>`** for adding cards — full picker UX with built-in, custom, and HACS cards. Used inline, no `show-create-card-dialog` round-trip
-- 📋 **Paste-from-clipboard banner** — shares HA's `dashboardCardClipboard` sessionStorage key, so cards copied from any HA editor (built-in stack, this card, etc.) can be pasted here
-- 🧩 **Embedded `<hui-card-element-editor>`** per child — the same nested editor HA uses; auto-detects per-type GUI editors, falls back to YAML for types that don't ship one. Re-mounted on every reorder via Lit's `keyed()` directive (same mechanism HA itself uses) so reorder actually persists in YAML
-- 🚪 **Empty stack opens directly in the picker** — adding the card drops the user straight into card selection, no placeholder children to delete first
-- 🪧 **Inline empty-state placeholder** — never a spinning preview in the picker
-
-### Custom CSS
-- 🎨 **Top-level `stack_in_card_styles`** — CSS applied to the outer **stack card** (`ha-card` wrapper)
-- 🎯 **Per-child `cards[i].stack_in_card_styles`** — CSS injected into a single child's shadow DOM only (no leak to siblings)
-- 🛡️ **Namespaced field name** — avoids clashing with cards like `bubble-card` / `button-card` that use their own `styles:` field
-- ✏️ Both edited via `<ha-code-editor>` with entity / icon autocompletion in the visual editor
-- 🧳 Per-child styles travel with the card across reorder / copy / paste
-
-### Bug fixes carried over
-- 🔁 **Element double-registration guard** — loading the bundle twice (HACS + manual resource) no longer throws `NotSupportedError`
-- ✅ **Card validation in `setConfig`** — rejects unknown `mode` values and non-array `cards`
-- 🧹 **Cleanup on disconnect** — animation frames, mutation observer, and card promise all torn down in `disconnectedCallback`
-- 🔍 **`customCards.type` without `custom:` prefix** — HA's picker calls `document.createElement(type)` on this value; the prefix would fail silently and hang the preview tile
-
-### Performance & stability
-- 🚦 **Mutation-burst debounce** — live-updating children (`history-graph`, `mini-graph-card`, animations) no longer pin the main thread on repeated style re-walks; bursts are coalesced into a single pass every ~150 ms
-- 🎯 **Mutation filter** — observer ignores text / attribute changes and only reacts to actual element insertions
-- 🖼️ **SVG-namespace filter** — SVG child elements (`<path>`, `<animate>`, `<g>`, …) added by graphing cards (`mini-graph-card`, `apexcharts-card`) are excluded from the observer entirely; they can never introduce a new `ha-card` to strip, so reacting to them was pure overhead
-- 🌳 **Linear O(N) DOM walker** — `walkShadowAndLight` previously mixed `querySelectorAll('*')` with recursive child traversal, visiting shadow-DOM descendants once per ancestor level (quadratic growth). Now uses only direct `.children` per level with a visited guard; every node is touched exactly once
-- ⏱️ **CSS-injection retry cap tightened** — 3 × 200 ms instead of 10 × 500 ms; stuck children no longer spam `walkShadowAndLight` for 5 seconds
-- 🧹 **CSS-injection retry cancellation** — pending retries are cancelled when the stack is rebuilt or disconnected, preventing stale CSS from leaking into new card structures
-- 🪟 **Picker null-deref fix** — `<hui-card-picker>` is now unmounted on the next animation frame after a pick, so its own `updated()` pass finishes cleanly (no more `getElementById on null` at `hui-card-picker.ts:286`)
-
-### CI / packaging
-
-- 🤖 **Continuous Integration** — `.github/workflows/build.yml` typechecks and builds the project on push to catch errors early, without polluting git history
-- 🏷️ **Tagged-release workflow** — `git tag v2.x.x && git push --tags` builds and creates a GitHub Release with the JS file as an asset
-- ✔️ **HACS validation workflow** — verifies the repo stays HACS-compliant on every push
-
-
 
 ---
 
