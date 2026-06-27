@@ -550,11 +550,8 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
           @value-changed=${this._valueChanged}
         ></ha-form>
 
-        <ha-expansion-panel outlined>
-          <div slot="header" style="display: flex; align-items: center; gap: 8px;">
-            <ha-svg-icon .path=${mdiCodeBraces}></ha-svg-icon>
-            Custom CSS — Stack card
-          </div>
+        <ha-expansion-panel .header=${'Custom CSS — Stack card'} outlined>
+          <ha-svg-icon slot="leading-icon" .path=${mdiCodeBraces}></ha-svg-icon>
           <div class="panel-content">
             <p class="styles-hint">
               CSS applied to the outer stack card itself. Target the wrapper with

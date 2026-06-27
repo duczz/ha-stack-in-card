@@ -1,7 +1,5 @@
 # Changelog
 
-All notable changes to this project are documented in this file.
-
 ## [2.0.2] — 2026-06-27
 
 ### ✨ Features
