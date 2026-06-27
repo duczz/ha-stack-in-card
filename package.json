@@ -1,6 +1,6 @@
 {
   "name": "stack-in-card",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Stack-in-Card for Home Assistant's Lovelace UI — borderless grouping of cards with a visual editor and custom CSS per card.",
   "main": "dist/stack-in-card.js",
   "type": "module",
