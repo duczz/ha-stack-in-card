@@ -13,6 +13,7 @@ import {
   mdiDelete,
   mdiListBoxOutline,
   mdiPlus,
+  mdiTune,
 } from '@mdi/js';
 
 import styles from './styles.css';
@@ -59,6 +60,7 @@ const SCHEMA = [
   {
     type: 'expandable',
     title: 'Keep options',
+    iconPath: mdiTune,
     schema: [
       {
         type: 'grid',
@@ -211,8 +213,14 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
       'keep.outer_padding',
     ];
     for (const path of keepPaths) {
-      if (updated[path]) setNested(copy, path, true);
-      else deleteNested(copy, path);
+      if (updated[path] === true) {
+        setNested(copy, path, true);
+      } else if (path === 'keep.outer_padding' && updated[path] === false) {
+        // We must explicitly save false so the backwards-compat default doesn't kick in
+        setNested(copy, path, false);
+      } else {
+        deleteNested(copy, path);
+      }
     }
     if (copy.keep && Object.keys(copy.keep).length === 0) delete copy.keep;
 
@@ -542,7 +550,7 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
           @value-changed=${this._valueChanged}
         ></ha-form>
 
-        <ha-expansion-panel .header=${'Custom CSS — Stack card'} outlined>
+        <ha-expansion-panel .header=${'Custom CSS — Stack card'} .iconPath=${mdiCodeBraces} outlined>
           <div class="panel-content">
             <p class="styles-hint">
               CSS applied to the outer stack card itself. Target the wrapper with
