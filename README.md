@@ -21,10 +21,11 @@ seamless card — without inner borders, shadows or padding gaps. Includes a
 
 ---
 
-## 🛠️ What's different from the original
+<a id="about-this-fork"></a>
+## 🛠️ About this fork
 
-This is a complete rewrite of the 2020-era `stack-in-card@0.2.0` on a
-current Home Assistant frontend stack (HA 2025.1+).
+This project is a modernised complete rewrite of the 2020-era `custom-cards/stack-in-card`, rebuilt to support the latest Home Assistant frontend stack (HA 2025.1+).
+For all new features, bug fixes, and improvements, please check the [CHANGELOG.md](CHANGELOG.md).
 
 ### Modernisation
 - ⚡ **Lit 3 + TypeScript 5.7 + Rollup 4** — full migration from Lit-element 2 / TS 4 / Rollup 2
@@ -65,18 +66,18 @@ Matches HA's own stack-card editor 1:1:
 - 🪟 **Picker null-deref fix** — `<hui-card-picker>` is now unmounted on the next animation frame after a pick, so its own `updated()` pass finishes cleanly (no more `getElementById on null` at `hui-card-picker.ts:286`)
 
 ### CI / packaging
-- 📦 **`dist/stack-in-card.js` shipped in master** — HACS finds the built file directly, no manual release required for installation
-- 🤖 **Auto-build on push** — `.github/workflows/build.yml` typechecks, builds, and commits `dist/` back to master
+
+- 🤖 **Continuous Integration** — `.github/workflows/build.yml` typechecks and builds the project on push to catch errors early, without polluting git history
 - 🏷️ **Tagged-release workflow** — `git tag v2.x.x && git push --tags` builds and creates a GitHub Release with the JS file as an asset
 - ✔️ **HACS validation workflow** — verifies the repo stays HACS-compliant on every push
 
-For the full version history see [CHANGELOG.md](CHANGELOG.md).
+
 
 ---
 
 ## Table of Contents
 
-- [What's different](#️-whats-different-from-the-original)
+- [About this fork](#about-this-fork)
 - [Requirements](#-requirements)
 - [Installation](#-installation)
 - [Visual Editor](#-visual-editor)
