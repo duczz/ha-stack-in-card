@@ -21,15 +21,6 @@ seamless card — without inner borders, shadows or padding gaps. Includes a
 
 ---
 
-<a id="about-this-fork"></a>
-## 🛠️ About this fork
-
-This project is a modernised complete rewrite of the 2020-era `custom-cards/stack-in-card`, rebuilt to support the latest Home Assistant frontend stack (HA 2025.1+).
-For all new features, bug fixes, and improvements, please check the [CHANGELOG.md](CHANGELOG.md).
-
-
----
-
 ## Table of Contents
 
 - [About this fork](#about-this-fork)
@@ -45,6 +36,14 @@ For all new features, bug fixes, and improvements, please check the [CHANGELOG.m
   - [Tips](#tips)
 - [Examples](#-examples)
 - [Migration from the original `stack-in-card`](#-migration-from-the-original-stack-in-card)
+
+---
+
+<a id="about-this-fork"></a>
+## 🛠️ About this fork
+
+This project is a modernised complete rewrite of the 2020-era `custom-cards/stack-in-card`, rebuilt to support the latest Home Assistant frontend stack (HA 2025.1+).
+For all new features, bug fixes, and improvements, please check the [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
