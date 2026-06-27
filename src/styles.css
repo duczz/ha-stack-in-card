@@ -262,7 +262,4 @@ hui-card-picker {
   margin-left: auto;
 }
 
-ha-expansion-panel {
-  --expansion-panel-summary-padding: 0 12px;
-  --expansion-panel-content-padding: 0 8px;
-}
+
