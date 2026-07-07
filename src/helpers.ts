@@ -3,12 +3,25 @@ import { HASS, LovelaceCard, LovelaceCardConfig, StackChildCardConfig } from './
 let helpersPromise: Promise<any> | undefined;
 
 export function loadCardHelpers(): Promise<any> {
-  if (!helpersPromise) {
-    const win = window as any;
-    helpersPromise = typeof win.loadCardHelpers === 'function'
-      ? win.loadCardHelpers()
-      : Promise.reject(new Error('loadCardHelpers is not available'));
+  // Return the cached promise only once we know it resolved (or is pending).
+  if (helpersPromise) return helpersPromise;
+
+  const win = window as any;
+  if (typeof win.loadCardHelpers !== 'function') {
+    // Don't cache this rejection: HA may register `loadCardHelpers` a moment
+    // after our first call (frontend still booting). Caching the rejection
+    // would poison the card until a full page reload. Returning a fresh
+    // rejection each time lets the next setConfig/_createStack retry.
+    return Promise.reject(new Error('loadCardHelpers is not available'));
   }
+
+  const p = win.loadCardHelpers();
+  helpersPromise = p;
+  // If the helpers promise itself rejects, drop it from the cache so a later
+  // call can retry instead of being stuck on the rejected promise forever.
+  p.catch(() => {
+    if (helpersPromise === p) helpersPromise = undefined;
+  });
   return helpersPromise as Promise<any>;
 }
 
