@@ -67,7 +67,7 @@ For all new features, bug fixes, and improvements, please check the [CHANGELOG.m
 
 ### Manual
 
-1. Download `stack-in-card.js` from the [latest release][release-url] (or from `dist/stack-in-card.js` on master) and place it in `config/www/`.
+1. Download `stack-in-card.js` from the [latest release][release-url] and place it in `config/www/`.
 2. Add to your Lovelace resources:
 
 ```yaml
@@ -173,6 +173,7 @@ Because per-child CSS lives on the child config, it travels with the card across
 - `background` needs `!important` to override HA's `--ha-card-background` theme variable. `border-radius`, `box-shadow`, and most other properties usually don't.
 - The visual editor's CSS editors use `mode="yaml"` because HA's `<ha-code-editor>` doesn't ship a CSS mode. Highlighting won't perfectly match CSS, but everything works.
 - Prefer HA's CSS variables (`--primary-color`, `--card-background-color`, etc.) so your stack respects the active theme.
+- Copying or cutting a child card in the editor puts its full config — including the `stack_in_card_styles` field — onto Home Assistant's shared clipboard. Pasting it back into another stack-in-card keeps the CSS. Pasting it into a plain dashboard card works too, but some cards with strict config validation may reject the extra `stack_in_card_styles` key; just delete that key if a paste target complains.
 
 #### Keep the background of one specific child
 
@@ -255,6 +256,7 @@ npm install
 npm run dev        # rollup watch
 npm run build      # production build → dist/stack-in-card.js
 npm run typecheck
+npm test           # vitest (jsdom)
 ```
 
 Build output is a single ES module at `dist/stack-in-card.js` (~48 KB minified).

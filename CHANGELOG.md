@@ -1,5 +1,72 @@
 # Changelog
 
+## [2.0.3] — 2026-07-07
+
+### 🐛 Bug Fixes
+
+- **Runtime:** The child `MutationObserver` is no longer a one-shot. It was
+  disconnected around each style pass but never re-observed afterwards (an
+  existence guard skipped reconnection), so any card that mounts its inner
+  `ha-card` *after* the first mutation — button-card templates, conditional
+  cards, `ll-rebuild` swaps — was silently left with borders/shadows/margins.
+  The observer now reconnects after every pass, and its callback ignores our
+  own injected `<style>` tags so the reconnect can't trigger an endless
+  re-style loop.
+- **Runtime:** Nested `stack-in-card`s no longer clobber each other's custom
+  CSS. Both used the same `<style>` tag id, so the outer card's cleanup pass
+  deleted the inner card's injected per-child styles. Each card instance now
+  uses a unique tag id.
+- **Runtime:** `getCardSize()` no longer rejects when the inner stack failed to
+  build. The rejected build promise is now caught and a default size is
+  returned, so Home Assistant's layout code can't hit an unhandled rejection.
+- **Runtime:** A failed `loadCardHelpers()` (e.g. called before the HA frontend
+  finished booting) is no longer cached forever. The rejection is dropped so
+  the next `setConfig` retries instead of the card staying broken until reload.
+- **Runtime:** The style pass and child observer are now re-established when the
+  card is detached and reattached to the DOM (e.g. a drag reorder in the
+  dashboard editor). Previously a reattach left the observer torn down, so
+  late-mounting children were no longer stripped.
+- **Runtime:** A late-arriving `hass` now repaints the card. If `hass` was set
+  after the first render — most visibly for an empty stack, which has no later
+  `_card` change to force a repaint — the card could stay blank; it now
+  requests a single update on the first `hass`.
+- **Runtime:** The mutation debounce now has a 1s max-wait ceiling, so a child
+  that mutates faster than the 150ms debounce interval (a perpetually animating
+  card) can no longer starve the style pass indefinitely.
+- **Editor:** The custom-CSS editors no longer trim the value on every change.
+  Trimming and feeding the result back caused `ha-code-editor` to replace its
+  document mid-edit and jump the cursor. The raw value is stored (the runtime
+  trims before injecting, so rendered output is unchanged).
+- **Editor:** The embedded card picker could stay permanently, silently empty
+  when editing an *existing* stack-in-card in a fresh browser session. Root
+  cause (verified in the HA frontend source back to 2025.1): HA only registers
+  its internal `<hui-card-picker>` when one of its own modules that imports it
+  happens to load — the add-card dialog or a native stack/conditional card
+  editor. The edit-card dialog, where this editor lives, does **not** import
+  it, so our embedded tag stayed a dead, never-upgraded element until some
+  other flow loaded the picker. The editor now deterministically preloads HA's
+  stack-card editor module via the `loadCardHelpers()` API (which registers
+  every embedded HA-internal: picker, element editor, tab group, arrow
+  buttons). As a safety net, if the picker still isn't registered after 6
+  seconds, a warning banner is shown instead of a silently empty area; it
+  clears itself automatically if the picker registers late — the browser
+  auto-upgrades any already-present tag once its class is defined.
+
+### 🧪 Internal
+
+- Added a `vitest` + `jsdom` test setup (matching the sibling cards) with
+  regression tests covering all the runtime/editor fixes above (`npm test`,
+  25 tests). CI now runs typecheck + tests on push/PR.
+- Removed dead CSS rules (`.child-actions__spacer`, `.styles-editor--loading`,
+  `.editor-footer__hint`, the unused `--sic-default-gap` custom property) and
+  the unused `DEBUG` build-time injection.
+- Empty-state placeholder icon is now an inline `<svg>` (path via the named
+  `mdiPlusThick` import) instead of `<ha-svg-icon>`, removing the runtime
+  render path's only dependency on an HA-internal component. Same icon, same
+  size/colour.
+- CI workflows now use `npm ci` instead of `npm install` for reproducible
+  installs.
+
 ## [2.0.2] — 2026-06-27
 
 ### ✨ Features
