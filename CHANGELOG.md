@@ -54,6 +54,11 @@
 
 ### 🧪 Internal
 
+- `dist/stack-in-card.js` is no longer committed to the repository — it is
+  gitignored, and distribution happens exclusively via GitHub release assets:
+  the release workflow builds and uploads the file when a release is
+  published, and HACS installs from the latest release instead of `master`.
+  Push/PR CI no longer builds at all.
 - Added a `vitest` + `jsdom` test setup (matching the sibling cards) with
   regression tests covering all the runtime/editor fixes above (`npm test`,
   25 tests). CI now runs typecheck + tests on push/PR.
