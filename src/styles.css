@@ -1,7 +1,3 @@
-:host {
-  --sic-default-gap: 8px;
-}
-
 .card-config {
   display: flex;
   flex-direction: column;
@@ -134,10 +130,6 @@
   padding: 4px 0 8px;
 }
 
-.child-actions__spacer {
-  flex: 1;
-}
-
 .child-actions ha-icon-button[disabled] {
   opacity: 0.4;
   pointer-events: none;
@@ -229,16 +221,6 @@ hui-card-picker {
   color: var(--secondary-text-color);
 }
 
-/* ----------------------------- Loading placeholder -------------------- */
-
-.styles-editor--loading {
-  align-items: center;
-  justify-content: center;
-  color: var(--secondary-text-color);
-  font-size: var(--ha-font-size-s, 12px);
-  font-style: italic;
-}
-
 /* ----------------------------- Footer --------------------------------- */
 
 .editor-footer {
@@ -249,11 +231,6 @@ hui-card-picker {
   flex-wrap: wrap;
   border-top: 1px solid var(--divider-color, #e0e0e0);
   margin-top: 8px;
-}
-
-.editor-footer__hint {
-  font-size: var(--ha-font-size-s, 12px);
-  color: var(--secondary-text-color);
 }
 
 .editor-footer__version {

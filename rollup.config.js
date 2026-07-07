@@ -16,7 +16,6 @@ const plugins = [
   json(),
   inject(
     {
-      DEBUG: dev,
       BUILD_TIME: new Date().toLocaleString('en-GB', {
         day: '2-digit',
         month: '2-digit',

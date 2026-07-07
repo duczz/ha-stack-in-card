@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing, PropertyValues, TemplateResult } from 'lit';
 import { state } from 'lit/decorators.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
+import { mdiPlusThick } from '@mdi/js';
 
 import {
   HASS,
@@ -16,8 +17,19 @@ import {
 } from './helpers';
 import './editor';
 
-const CHILD_STYLE_TAG_ID = 'stack-in-card-child-style';
+// Shared prefix for every <style> tag we inject (mother + per-child). The
+// mutation observer uses it to recognise our own writes and skip them, so our
+// CSS injection can't feed back into an endless reschedule loop.
+const STYLE_TAG_ID_PREFIX = 'stack-in-card-';
 const MOTHER_STYLE_TAG_ID = 'stack-in-card-mother-style';
+
+// Monotonic instance counter → each StackInCard gets a unique per-child style
+// tag id. Two *nested* stack-in-cards would otherwise share the constant id
+// 'stack-in-card-child-style': the outer card's cleanup pass walks into the
+// inner card's subtree and would delete the inner card's injected <style>
+// tags (and vice-versa). A per-instance id keeps each card's cleanup scoped
+// to its own tags.
+let instanceCounter = 0;
 
 export default class StackInCard extends LitElement implements LovelaceCard {
   @state() private _card?: LovelaceCard;
@@ -35,6 +47,10 @@ export default class StackInCard extends LitElement implements LovelaceCard {
   // Monotonic counter so out-of-order async createStack() calls cannot
   // overwrite a newer _card with an older one (rapid setConfig from the editor).
   private _stackGeneration = 0;
+  // Per-instance id for this card's injected per-child <style> tags. Unique so
+  // nested stack-in-cards don't clobber each other's styles (see comment on
+  // instanceCounter above).
+  private readonly _childStyleTagId = `stack-in-card-child-style-${++instanceCounter}`;
 
   static get styles() {
     return css`
@@ -55,7 +71,8 @@ export default class StackInCard extends LitElement implements LovelaceCard {
         text-align: center;
       }
       .stack-in-card-empty__icon {
-        --mdc-icon-size: 36px;
+        width: 36px;
+        height: 36px;
         color: var(--secondary-text-color);
         opacity: 0.7;
       }
@@ -84,8 +101,15 @@ export default class StackInCard extends LitElement implements LovelaceCard {
   }
 
   set hass(hass: HASS) {
+    const hadHass = this._hass !== undefined;
     this._hass = hass;
     if (this._card) this._card.hass = hass;
+    // `_hass` is deliberately not a reactive @state (we don't want a full
+    // mother re-render on every state tick). But the *first* hass arrival
+    // matters: the initial render() bailed on the `!this._hass` guard, and if
+    // the stack is empty there's no later `_card` change to trigger a repaint,
+    // so the card would stay blank. Request a single update on that transition.
+    if (!hadHass) this.requestUpdate();
   }
 
   get hass(): HASS | undefined {
@@ -126,6 +150,16 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     this._createStack();
   }
 
+  connectedCallback(): void {
+    super.connectedCallback();
+    // Re-establish the style pass + child observer after a detach/reattach
+    // (e.g. the dashboard editor moves our element in the DOM during a drag
+    // reorder). disconnectedCallback tears the observer down; a plain reattach
+    // changes neither _card nor _config, so updated() bails and nothing else
+    // rebuilds it. Kick a pass when we already have a card to re-strip.
+    if (this._card) this._scheduleStyleApplication();
+  }
+
   disconnectedCallback(): void {
     super.disconnectedCallback();
     if (this._styleApplyRafHandle !== null) {
@@ -136,6 +170,7 @@ export default class StackInCard extends LitElement implements LovelaceCard {
       clearTimeout(this._styleApplyTimeoutHandle);
       this._styleApplyTimeoutHandle = null;
     }
+    this._firstPendingMutationTs = null;
     // Cancel any pending _applyChildCss retries — the element is gone.
     this._retryTimeouts.forEach((id) => clearTimeout(id));
     this._retryTimeouts.clear();
@@ -158,6 +193,21 @@ export default class StackInCard extends LitElement implements LovelaceCard {
   // get coalesced via a setTimeout debounce; "real" updates (new _card or
   // _config) go through rAF only for a snappy first paint.
   private static readonly _MUTATION_DEBOUNCE_MS = 150;
+  // Upper bound on how long a stream of back-to-back mutations may keep pushing
+  // the debounced style pass out. Without it, a child mutating faster than the
+  // debounce interval (a perpetually animating card) would reset the timer
+  // forever and the pass would never run.
+  private static readonly _MUTATION_MAX_WAIT_MS = 1000;
+  // Timestamp of the first mutation in the current pending burst; null when no
+  // mutation-triggered pass is pending. Used to enforce the max-wait ceiling.
+  private _firstPendingMutationTs: number | null = null;
+
+  private _runStylePass(): void {
+    this._styleApplyRafHandle = requestAnimationFrame(() => {
+      this._styleApplyRafHandle = null;
+      this._applyAllStyles();
+    });
+  }
 
   private _scheduleStyleApplication(fromMutation = false): void {
     if (this._styleApplyRafHandle !== null) {
@@ -168,20 +218,26 @@ export default class StackInCard extends LitElement implements LovelaceCard {
       clearTimeout(this._styleApplyTimeoutHandle);
       this._styleApplyTimeoutHandle = null;
     }
-    const runRaf = () => {
-      this._styleApplyRafHandle = requestAnimationFrame(() => {
-        this._styleApplyRafHandle = null;
-        this._applyAllStyles();
-      });
-    };
-    if (fromMutation) {
-      this._styleApplyTimeoutHandle = setTimeout(() => {
-        this._styleApplyTimeoutHandle = null;
-        runRaf();
-      }, StackInCard._MUTATION_DEBOUNCE_MS);
-    } else {
-      runRaf();
+    if (!fromMutation) {
+      // A "real" update (new _card / _config / reconnect) flushes any pending
+      // mutation burst and paints immediately.
+      this._firstPendingMutationTs = null;
+      this._runStylePass();
+      return;
     }
+    const now = Date.now();
+    if (this._firstPendingMutationTs === null) this._firstPendingMutationTs = now;
+    // Shrink the debounce as we approach the ceiling so the pass is guaranteed
+    // to run within _MUTATION_MAX_WAIT_MS of the first pending mutation, even
+    // if mutations keep arriving faster than the debounce interval.
+    const remaining =
+      StackInCard._MUTATION_MAX_WAIT_MS - (now - this._firstPendingMutationTs);
+    const wait = Math.max(0, Math.min(StackInCard._MUTATION_DEBOUNCE_MS, remaining));
+    this._styleApplyTimeoutHandle = setTimeout(() => {
+      this._styleApplyTimeoutHandle = null;
+      this._firstPendingMutationTs = null;
+      this._runStylePass();
+    }, wait);
   }
 
   private async _applyAllStyles(): Promise<void> {
@@ -218,32 +274,50 @@ export default class StackInCard extends LitElement implements LovelaceCard {
   }
 
   private _ensureChildObserver(): void {
-    if (this._childObserver || !this._card) return;
+    if (!this._card) return;
     const root = this._card.shadowRoot ?? this._card;
-    this._childObserver = new MutationObserver((mutations) => {
-      // Only react to mutations that add *element* nodes. Live-updating
-      // children (history-graph, mini-graph-card, animations) fire dozens
-      // of mutations per second; most are text / attribute changes that
-      // cannot introduce a new ha-card to strip. Filtering them out keeps
-      // us from re-walking the whole subtree on every animation frame.
-      for (const m of mutations) {
-        if (m.type !== 'childList') continue;
-        for (let i = 0; i < m.addedNodes.length; i++) {
-          const node = m.addedNodes[i];
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            // Skip SVG-namespace elements — graphing cards (mini-graph-card,
-            // apexcharts-card, history-graph) mutate <path>, <animate> and
-            // other SVG children on every animation frame. SVG elements can
-            // never introduce a new ha-card that needs style-stripping, so
-            // reacting to them is pure overhead.
-            if ((node as Element).namespaceURI === 'http://www.w3.org/2000/svg') continue;
-            this._scheduleStyleApplication(true);
-            return;
-          }
+    // Reuse the existing observer instance across style passes. _applyAllStyles
+    // disconnects it around its own DOM writes and then calls us again to
+    // reconnect — so this MUST (re-)observe even when _childObserver already
+    // exists. The previous `if (this._childObserver) return` guard turned the
+    // observer into a one-shot: after the first disconnect it never observed
+    // again, so late-mounting children (button-card templates, conditional
+    // cards, ll-rebuild swaps) were silently left unstyled.
+    if (!this._childObserver) {
+      this._childObserver = new MutationObserver((mutations) => {
+        if (this._mutationsWarrantRestyle(mutations)) {
+          this._scheduleStyleApplication(true);
         }
-      }
-    });
+      });
+    }
     this._childObserver.observe(root, { childList: true, subtree: true });
+  }
+
+  /**
+   * Decide whether a batch of mutations could have introduced a new ha-card
+   * that needs style-stripping. Filters out the noise that can't:
+   *   - non-childList mutations (attributes / character data)
+   *   - non-element nodes (text, comments)
+   *   - SVG-namespace elements — graphing cards (mini-graph-card, apexcharts,
+   *     history-graph) mutate <path>/<animate>/<g> every animation frame; these
+   *     can never carry an ha-card, so reacting to them is pure overhead
+   *   - our OWN injected <style> tags — otherwise _applyChildCss's writes
+   *     (and its async retries, which run after the observer reconnects) would
+   *     each trigger a fresh pass, i.e. an endless reschedule loop
+   */
+  private _mutationsWarrantRestyle(mutations: MutationRecord[]): boolean {
+    for (const m of mutations) {
+      if (m.type !== 'childList') continue;
+      for (let i = 0; i < m.addedNodes.length; i++) {
+        const node = m.addedNodes[i];
+        if (node.nodeType !== Node.ELEMENT_NODE) continue;
+        const el = node as Element;
+        if (el.namespaceURI === 'http://www.w3.org/2000/svg') continue;
+        if (el.tagName === 'STYLE' && el.id.startsWith(STYLE_TAG_ID_PREFIX)) continue;
+        return true;
+      }
+    }
+    return false;
   }
 
   private async _createStack(): Promise<void> {
@@ -320,10 +394,13 @@ export default class StackInCard extends LitElement implements LovelaceCard {
       return html`
         <ha-card header=${ifDefined(this._config.title)}>
           <div class="stack-in-card-empty">
-            <ha-svg-icon
+            <svg
               class="stack-in-card-empty__icon"
-              .path=${'M20 14H14V20H10V14H4V10H10V4H14V10H20V14Z'}
-            ></ha-svg-icon>
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path d=${mdiPlusThick} fill="currentColor"></path>
+            </svg>
             <div class="stack-in-card-empty__title">Stack In Card</div>
             <div class="stack-in-card-empty__sub">
               Add child cards from the editor.
@@ -457,9 +534,10 @@ export default class StackInCard extends LitElement implements LovelaceCard {
 
   private _applyChildCss(child: HTMLElement, cssText: string | undefined, attempt: number): void {
     // Always clear stale injected tags first so an empty cssText actually
-    // removes the previous CSS.
+    // removes the previous CSS. We query by *this instance's* tag id so a
+    // nested stack-in-card's tags (same prefix, different id) survive.
     walkShadowAndLight(child, (node) => {
-      const tag = (node as any).querySelector?.(`#${CHILD_STYLE_TAG_ID}`);
+      const tag = (node as any).querySelector?.(`#${this._childStyleTagId}`);
       tag?.remove();
     });
     if (!cssText) return;
@@ -487,20 +565,30 @@ export default class StackInCard extends LitElement implements LovelaceCard {
   }
 
   private _writeStyleTag(root: ShadowRoot | HTMLElement, cssText: string): void {
-    let tag = (root as any).querySelector?.(`#${CHILD_STYLE_TAG_ID}`) as
+    let tag = (root as any).querySelector?.(`#${this._childStyleTagId}`) as
       | HTMLStyleElement
       | null
       | undefined;
     if (!tag) {
       tag = document.createElement('style');
-      tag.id = CHILD_STYLE_TAG_ID;
+      tag.id = this._childStyleTagId;
       (root as any).appendChild(tag);
     }
     if (tag.textContent !== cssText) tag.textContent = cssText;
   }
 
   public async getCardSize(): Promise<number> {
-    if (this._cardPromise) await this._cardPromise;
+    // _createStack already logs and swallows build failures, but the rejected
+    // promise lingers on _cardPromise. Guard the await so HA's layout code
+    // (which calls getCardSize) doesn't get an unhandled rejection — fall back
+    // to a sane default size instead.
+    if (this._cardPromise) {
+      try {
+        await this._cardPromise;
+      } catch {
+        return 1;
+      }
+    }
     if (!this._card) return 1;
     return computeCardSize(this._card);
   }

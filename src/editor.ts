@@ -18,7 +18,7 @@ import {
 
 import styles from './styles.css';
 import fireEvent from './fireEvent';
-import { deepClone, stripStackInCardFields } from './helpers';
+import { deepClone, loadCardHelpers, stripStackInCardFields } from './helpers';
 import { version } from '../package.json';
 import {
   HASS,
@@ -33,6 +33,27 @@ import {
 // will automatically offer our copied/cut card as a paste option at the
 // top of the "Add card" list.
 const HA_CLIPBOARD_KEY = 'dashboardCardClipboard';
+
+// HA registers <hui-card-picker> only when one of ITS OWN modules that
+// imports it happens to load: the add-card dialog (hui-dialog-create-card),
+// or the native stack / conditional card editors. The edit-card dialog —
+// which is where THIS editor lives when the user edits an existing card —
+// does NOT import it (verified in the HA frontend source back to 2025.1).
+// So in a fresh browser session, editing an existing stack-in-card directly
+// would leave our embedded <hui-card-picker> a dead, never-upgraded tag
+// that silently renders nothing.
+//
+// Two-layer defence:
+//  1. _preloadCardPickerDeps() — deterministic fix. Loads HA's own stack
+//     card editor module via the semi-public loadCardHelpers() API;
+//     hui-stack-card-editor statically imports every HA-internal we embed
+//     (hui-card-picker, hui-card-element-editor, ha-tab-group(-tab),
+//     ha-icon-button-arrow-prev/next).
+//  2. _watchCardPickerLoad() — safety net. If the picker still isn't
+//     registered after a generous timeout, show a warning banner instead
+//     of a silently empty area.
+const CARD_PICKER_TAG = 'hui-card-picker';
+const CARD_PICKER_LOAD_TIMEOUT_MS = 6000;
 
 declare const process: { env: { BUILD_TIME: string } };
 const BUILD_TIME = process.env.BUILD_TIME;
@@ -140,6 +161,53 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
   // never updated by raw sessionStorage writes from outside its own
   // setValue() flow. So we render our own paste-entry above the picker.
   @state() private _clipboardCard?: StackChildCardConfig;
+  // True once we've given up waiting for <hui-card-picker> to register (see
+  // CARD_PICKER_LOAD_TIMEOUT_MS comment above). Flips back to false — and the
+  // real picker takes over automatically, since the browser upgrades any
+  // already-present tag the moment its class is defined — if it registers
+  // late instead of never.
+  @state() private _cardPickerLoadFailed = false;
+  private _pickerWatchStarted = false;
+  private _pickerPreloadStarted = false;
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    void this._preloadCardPickerDeps();
+    this._watchCardPickerLoad();
+  }
+
+  /** Deterministically register <hui-card-picker> (and the other embedded
+   * HA-internals) by loading HA's own stack-card editor module. See the
+   * CARD_PICKER_TAG comment above for why this is necessary. */
+  private async _preloadCardPickerDeps(): Promise<void> {
+    if (this._pickerPreloadStarted || customElements.get(CARD_PICKER_TAG)) return;
+    this._pickerPreloadStarted = true;
+    try {
+      const helpers = await loadCardHelpers();
+      // Creating a native stack card triggers HA's lazy import of the card
+      // module; its static getConfigElement() then dynamic-imports
+      // hui-stack-card-editor, which registers everything we embed.
+      helpers.createCardElement({ type: 'vertical-stack', cards: [] });
+      await customElements.whenDefined('hui-vertical-stack-card');
+      await (customElements.get('hui-vertical-stack-card') as any)?.getConfigElement?.();
+    } catch {
+      // loadCardHelpers unavailable or the editor import failed — the
+      // _watchCardPickerLoad banner below surfaces the problem to the user.
+    }
+  }
+
+  private _watchCardPickerLoad(): void {
+    if (this._pickerWatchStarted) return;
+    this._pickerWatchStarted = true;
+    let settled = false;
+    customElements.whenDefined(CARD_PICKER_TAG).then(() => {
+      settled = true;
+      this._cardPickerLoadFailed = false;
+    });
+    setTimeout(() => {
+      if (!settled) this._cardPickerLoadFailed = true;
+    }, CARD_PICKER_LOAD_TIMEOUT_MS);
+  }
 
   // Keyed identity map for the nested <hui-card-element-editor>. Lit's
   // `keyed()` directive uses these strings to decide whether to reuse the
@@ -242,9 +310,13 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
   private _motherStyleChanged = (ev: CustomEvent) => {
     if (!this._config) return;
     ev.stopPropagation();
-    const value = (((ev.detail as any)?.value ?? '') as string).trim();
+    // Store the RAW editor value — don't trim. Trimming and feeding the
+    // trimmed string back via `.value` makes ha-code-editor replace its
+    // document mid-edit, which jumps the cursor. Only the emptiness check
+    // trims; the runtime trims again before injecting, so output is unchanged.
+    const raw = ((ev.detail as any)?.value ?? '') as string;
     const copy = deepClone(this._config) as StackInCardConfig;
-    if (value) copy.stack_in_card_styles = value;
+    if (raw.trim()) copy.stack_in_card_styles = raw;
     else delete (copy as any).stack_in_card_styles;
     this._fireConfigChanged(copy);
   };
@@ -255,12 +327,13 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
   private _selectedChildStyleChanged = (ev: CustomEvent) => {
     if (!this._config || this._selectedChild === null) return;
     ev.stopPropagation();
-    const value = (((ev.detail as any)?.value ?? '') as string).trim();
+    // Raw value, not trimmed — see _motherStyleChanged for why.
+    const raw = ((ev.detail as any)?.value ?? '') as string;
     const idx = this._selectedChild;
     const cards = (this._config.cards ?? []).slice();
     if (!cards[idx]) return;
     const child: StackChildCardConfig = { ...cards[idx] };
-    if (value) child.stack_in_card_styles = value;
+    if (raw.trim()) child.stack_in_card_styles = raw;
     else delete child.stack_in_card_styles;
     cards[idx] = child;
     const copy = deepClone(this._config) as StackInCardConfig;
@@ -512,6 +585,15 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
                   </div>
                 </div>
               </button>
+            `
+          : nothing}
+        ${this._cardPickerLoadFailed
+          ? html`
+              <ha-alert alert-type="warning">
+                Card picker failed to load. Try a hard refresh
+                (Ctrl+Shift+R / Cmd+Shift+R). If that doesn't help, clear your
+                browser's cached data for this Home Assistant instance.
+              </ha-alert>
             `
           : nothing}
         <hui-card-picker
