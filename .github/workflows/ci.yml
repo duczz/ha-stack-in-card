@@ -1,21 +1,22 @@
-name: Build
+name: CI
 
+# Typecheck + unit tests — no build on push. dist/stack-in-card.js is built
+# exclusively by the release workflow (release.yml) and distributed as a
+# GitHub release asset.
 on:
   push:
     branches:
       - master
       - main
+  pull_request:
+    branches:
+      - master
+      - main
   workflow_dispatch:
 
-concurrency:
-  group: repo-write
-  cancel-in-progress: false
-
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -25,10 +26,12 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Build
-        run: npm run build
+      - name: Unit tests
+        run: npm test
+        env:
+          CI: true
