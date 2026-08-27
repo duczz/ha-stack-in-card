@@ -18,7 +18,12 @@ import {
 
 import styles from './styles.css';
 import fireEvent from './fireEvent';
-import { deepClone, loadCardHelpers, stripStackInCardFields } from './helpers';
+import {
+  deepClone,
+  isStackInCardConfig,
+  loadCardHelpers,
+  stripStackInCardFields,
+} from './helpers';
 import { version } from '../package.json';
 import {
   HASS,
@@ -307,6 +312,29 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
   /* ------------------------------- styles ----------------------------------- */
 
   // Mother CSS lives directly on `_config.stack_in_card_styles` as a plain string.
+  /** Is this editor rendered inside another stack-in-card editor?
+   *
+   * Only used to label the stack-CSS panel. Nested, both editors are on screen
+   * at once and a single shared heading made the two boxes impossible to tell
+   * apart — including for the pointer we render in place of the outer card's
+   * per-child box, which names its target.
+   *
+   * Walks the shadow host chain upwards. It only looks for our own tag, never
+   * for an HA internal, so an HA restructure can at worst make the label
+   * ambiguous again — hence the catch-all rather than a hard failure. */
+  private get _isNested(): boolean {
+    try {
+      let node: any = this;
+      while (node) {
+        node = node.getRootNode?.()?.host;
+        if (node?.tagName?.toLowerCase() === 'stack-in-card-editor') return true;
+      }
+    } catch {
+      // Unexpected DOM shape — fall back to the plain label.
+    }
+    return false;
+  }
+
   private _motherStyleChanged = (ev: CustomEvent) => {
     if (!this._config) return;
     ev.stopPropagation();
@@ -504,11 +532,19 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
     if (!newCardConfig) return;
     const idx = this._selectedChild;
     const previousChild = this._config.cards?.[idx];
-    // Preserve our `stack_in_card_styles` field — HA's nested card editor
-    // strips unknown keys when it re-emits the child config, so we re-attach
-    // it ourselves.
+    // Preserve our `stack_in_card_styles` field — HA's *form-based* built-in
+    // editors rebuild the child config from their schema and drop unknown
+    // keys, so we re-attach it ourselves. (The wrapper
+    // <hui-card-element-editor> passes unknown keys through untouched;
+    // measured. Were that not so, YAML mode would be broken for every custom
+    // card, which consists of nothing but unknown keys.)
+    //
+    // Exception: a nested stack-in-card. Its editor is ours and keeps the
+    // field, so an unconditional re-attach would overwrite a value the user
+    // just typed with the old one — after which the no-op filter below sees
+    // "nothing changed" and drops the edit without a trace.
     const merged: StackChildCardConfig = { ...newCardConfig };
-    if (previousChild?.stack_in_card_styles) {
+    if (previousChild?.stack_in_card_styles && !isStackInCardConfig(newCardConfig)) {
       merged.stack_in_card_styles = previousChild.stack_in_card_styles;
     }
     // Skip the round-trip when nothing changed. HA's nested editor sometimes
@@ -617,10 +653,21 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
     const selectedCard =
       selected !== null && selected >= 0 && selected < cards.length ? cards[selected] : undefined;
     const selectedChildCss = selectedCard?.stack_in_card_styles ?? '';
-    // HA's <hui-card-element-editor> doesn't know about our
-    // `stack_in_card_styles` field and would warn / strip it. Hand it a
+    // A nested stack-in-card owns the field itself — it is that card's mother
+    // CSS, edited in its own editor below. We neither strip it on the way down
+    // nor offer a per-child box for it here; two boxes for one field is how
+    // the edit used to get lost.
+    const selectedIsStack = isStackInCardConfig(selectedCard);
+    // HA's form-based built-in editors don't know about our
+    // `stack_in_card_styles` field and would warn / strip it. Hand them a
     // stripped copy.
-    const selectedCardForEditor = selectedCard ? stripStackInCardFields(selectedCard) : undefined;
+    // Always a copy, never the live `_config.cards[i]` object — the nested
+    // editor must not be able to mutate our config in place.
+    const selectedCardForEditor = selectedCard
+      ? selectedIsStack
+        ? { ...selectedCard }
+        : stripStackInCardFields(selectedCard)
+      : undefined;
 
     return html`
       <div class="card-config">
@@ -634,7 +681,9 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
 
         <ha-expansion-panel outlined>
           <ha-svg-icon slot="leading-icon" .path=${mdiCodeBraces}></ha-svg-icon>
-          <div slot="header" role="heading" aria-level="3">Custom CSS — Stack card</div>
+          <div slot="header" role="heading" aria-level="3">
+            Custom CSS — ${this._isNested ? 'Nested stack card' : 'Stack card'}
+          </div>
           <div class="panel-content">
             <p class="styles-hint">
               CSS applied to the outer stack card itself. Target the wrapper with
@@ -783,20 +832,41 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
                   )}
                 </div>
 
-                <div class="section-label">Custom CSS — Card ${selected! + 1}</div>
-                <p class="styles-hint">
-                  CSS injected into this child card's shadow DOM. Doesn't affect sibling cards.
-                </p>
-                <div class="styles-editor">
-                  <ha-code-editor
-                    mode="yaml"
-                    autocomplete-entities
-                    autocomplete-icons
-                    .hass=${this.hass}
-                    .value=${selectedChildCss}
-                    @value-changed=${this._selectedChildStyleChanged}
-                  ></ha-code-editor>
-                </div>
+                ${selectedIsStack
+                  ? html`
+                      <!-- Deliberately NOT labelled "Custom CSS — Card N": the
+                           nested card's own editor renders a section with that
+                           exact text, and two identical headings — one of them
+                           without a field — is what made the nested CSS boxes
+                           impossible to tell apart. -->
+                      <div class="section-label">Card ${selected! + 1} is a stack card</div>
+                      <p class="styles-hint">
+                        Its CSS lives in its own
+                        <strong>Custom CSS — Nested stack card</strong> box above — so it
+                        applies to that card only, not to the cards inside it.
+                      </p>
+                    `
+                  : html`
+                      <div class="section-label">Custom CSS — Card ${selected! + 1}</div>
+                      <p class="styles-hint">
+                        CSS injected into this child card's shadow DOM, where it stays —
+                        the shadow boundary isolates it, not the selector. A card that
+                        keeps its <code>ha-card</code> outside a shadow DOM can only be
+                        styled in the scope it shares with its siblings, so its CSS may
+                        reach them; a card with neither receives nothing. Almost every
+                        card has a shadow DOM.
+                      </p>
+                      <div class="styles-editor">
+                        <ha-code-editor
+                          mode="yaml"
+                          autocomplete-entities
+                          autocomplete-icons
+                          .hass=${this.hass}
+                          .value=${selectedChildCss}
+                          @value-changed=${this._selectedChildStyleChanged}
+                        ></ha-code-editor>
+                      </div>
+                    `}
               `
             : this._renderCardPicker(false)}
 

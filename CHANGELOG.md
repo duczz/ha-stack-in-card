@@ -1,5 +1,71 @@
 # Changelog
 
+## [2.0.4] — 2026-08-27
+
+### ⚠️ Behaviour change — custom CSS is scoped more tightly
+
+Two cases where custom CSS reached cards it was never meant to reach are fixed.
+Both change how existing dashboards render **without any config change**, so
+check yours if either applies:
+
+- **Per-child CSS no longer reaches sibling cards** — for every child card that
+  has a shadow DOM, which is nearly all of them. A rule that matches a host
+  element — `hui-card`, `#root`, a card type tag like `hui-entities-card` —
+  used to style *every* card in the stack, not just the one it was set on.
+  Rules targeting `ha-card` were unaffected, which is why the leak went
+  unnoticed for so long. The exception is a child that keeps its `ha-card`
+  outside a shadow DOM: it can still only be styled in the scope it shares
+  with its siblings, so its CSS may reach them whatever the selector.
+
+  Such host-level rules now match nothing, and there is no drop-in
+  replacement — the stack card's own **Custom CSS — Stack card** box cannot
+  reach those elements either, because they live in a different shadow root.
+  Express the intent on `ha-card` instead: `ha-card { margin: 4px }` in a
+  child's own CSS box does what `hui-card { margin: 4px }` used to do, and
+  only for that child. If you had a case that genuinely needs the old
+  behaviour, please open an issue.
+- **CSS set on a nested `stack-in-card` now applies to that card only.** It
+  used to be injected into the nested card's entire subtree, so the cards
+  *inside* it were styled too. To style those, set their CSS in the nested
+  card's own per-child boxes. A stack card sitting behind a `conditional` or
+  another stack was never affected by this and is unchanged — it always
+  received its own CSS.
+- **A child card that renders neither a shadow DOM nor an `ha-card` no longer
+  receives per-child CSS at all.** There is no way to tell which element such
+  a card wants styled, and the old catch-all placed the rules in the shared
+  scope, where they hit every sibling. If you have a card like this, please
+  open an issue with the card type — the fix is to recognise it explicitly
+  rather than to style the whole stack by accident.
+
+### 🐛 Bug Fixes
+
+- **Runtime:** Per-child CSS is no longer written into the child element's own
+  light DOM by default. That `<style>` lived in the tree scope of the outer
+  stack's shadow root — the same scope every sibling card shares — so it styled
+  siblings, contradicting the editor's own promise that per-child CSS "doesn't
+  affect sibling cards". CSS now goes into the child's shadow roots, and into
+  the shared scope only when the child keeps its `ha-card` there, because
+  nothing else can reach such a card.
+- **Runtime:** A directly nested `stack-in-card` keeps its own
+  `stack_in_card_styles`. It was stripped before the child config reached HA's
+  stack, so the nested card could never apply its own CSS — the field looked
+  live in its editor but had no effect — while the outer card injected the same
+  CSS across the nested card's whole subtree.
+- **Editor:** Custom CSS typed into a nested `stack-in-card`'s editor is no
+  longer silently discarded. The outer editor re-attached the previous value
+  unconditionally, after which the no-op filter concluded nothing had changed
+  and dropped the edit without an event or an error. The re-attach still runs
+  for ordinary child cards, whose form-based HA editors do drop unknown keys.
+- **Editor:** A nested `stack-in-card` no longer shows two identically labelled
+  "Custom CSS — Card N" sections, one of which silently did nothing. The outer
+  editor now points to the nested card's own CSS box instead of offering a
+  second one for the same field.
+- **Editor:** The stack card's own CSS box is labelled "Custom CSS — Nested
+  stack card" when its editor is rendered inside another one. Both boxes used
+  to be called "Custom CSS — Stack card", so in a nested card all four CSS
+  fields carried just two labels between them and there was no way to tell
+  which card you were styling.
+
 ## [2.0.3] — 2026-07-07
 
 ### 🐛 Bug Fixes

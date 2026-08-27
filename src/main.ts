@@ -12,6 +12,7 @@ import {
 import {
   createCardElement,
   computeCardSize,
+  isStackInCardConfig,
   stripStackInCardFields,
   walkShadowAndLight,
 } from './helpers';
@@ -181,11 +182,12 @@ export default class StackInCard extends LitElement implements LovelaceCard {
 
   protected updated(changedProperties: PropertyValues): void {
     super.updated(changedProperties);
-    if (!this._card) return;
     // Gate: only re-walk styles when something relevant changed. Without
     // this gate, any future @state addition would silently trigger a full
     // style pass on every Lit update.
     if (!changedProperties.has('_card') && !changedProperties.has('_config')) return;
+
+    if (!this._card) return;
     this._scheduleStyleApplication();
   }
 
@@ -344,7 +346,15 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     // Strip our own `stack_in_card_styles` field from each child config
     // before handing it to HA's stack — HA's strict config validators
     // would otherwise reject the unknown property on some card types.
-    const childConfigs = this._config!.cards.map(stripStackInCardFields);
+    //
+    // Exception: a child that is itself a stack-in-card keeps the field. For
+    // that child the field is its *own* mother CSS, and it knows what to do
+    // with it — no validator to appease, and stripping it left the inner card
+    // silently unable to style itself (its editor field looked live but had
+    // no effect).
+    const childConfigs = this._config!.cards.map((c) =>
+      isStackInCardConfig(c) ? c : stripStackInCardFields(c),
+    );
     const promise = createCardElement(
       { type: stackType, cards: childConfigs },
       this._hass,
@@ -527,7 +537,15 @@ export default class StackInCard extends LitElement implements LovelaceCard {
 
     const children = Array.from(root.children) as HTMLElement[];
     children.forEach((child, index) => {
-      const cssText = childConfigs[index]?.stack_in_card_styles?.trim();
+      const childConfig = childConfigs[index];
+      // A nested stack-in-card injects its own `stack_in_card_styles` as
+      // mother CSS, scoped to its own shadow root. Injecting it from here as
+      // well would walk its entire subtree and style its children too. Pass
+      // `undefined` rather than skipping the call — that still runs the
+      // cleanup walk, so styles left over from a config change disappear.
+      const cssText = isStackInCardConfig(childConfig)
+        ? undefined
+        : childConfig?.stack_in_card_styles?.trim();
       this._applyChildCss(child, cssText, 0);
     });
   }
@@ -542,19 +560,46 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     });
     if (!cssText) return;
 
-    // Brute-force inject into every shadow root + light-DOM node.
-    let foundShadow = false;
-    walkShadowAndLight(child, (node) => {
-      if (node instanceof ShadowRoot) foundShadow = true;
-      this._writeStyleTag(node, cssText);
-    });
+    // Collect the targets first, then decide where to actually write.
+    // `walkShadowAndLight` visits the child *element* itself plus every shadow
+    // root beneath it — nothing else.
+    const targets: (HTMLElement | ShadowRoot)[] = [];
+    walkShadowAndLight(child, (node) => targets.push(node));
+    const shadowRoots = targets.filter((n): n is ShadowRoot => n instanceof ShadowRoot);
 
-    // Retry if no shadow root has mounted yet (mushroom/button-card mount
-    // their internal ha-card asynchronously). Capped tight: 3× 200 ms (= 600 ms
-    // total) covers every card I've tested. The old 10× 500 ms (= 5 s) loop
-    // would keep spamming `walkShadowAndLight` long after a stuck card had
-    // given up, masking real perf issues.
-    if (!foundShadow && attempt < 3) {
+    // Shadow roots are private to this child — always safe to write into.
+    shadowRoots.forEach((node) => this._writeStyleTag(node, cssText));
+
+    // The child's own light DOM is a different matter: it is the scope the
+    // child SHARES with every sibling card (it belongs to the outer stack's
+    // shadow root), so a rule matching a host element — `hui-card`, `#root`, a
+    // card type tag — styles the siblings too. That leak went unnoticed for
+    // years because `ha-card { }`, the documented target, matches nothing at
+    // that level.
+    //
+    // So write there only when an `ha-card` actually lives in that shared
+    // scope: for such a card there is nowhere private to put the CSS, and
+    // reaching it wins. `querySelector` does not cross shadow boundaries, so
+    // this asks exactly that question.
+    //
+    // Do NOT reduce this to "did the subtree contain any shadow root": an
+    // `ha-card` is itself a shadow-DOM element, so a light-DOM `ha-card` would
+    // switch the condition off and the CSS would land only inside that card's
+    // shadow root — where `ha-card { }` matches nothing and the styling
+    // silently disappears.
+    const lightDomCard = child.matches?.('ha-card') || child.querySelector?.('ha-card');
+    if (lightDomCard) this._writeStyleTag(child, cssText);
+
+    // Retry while there was nowhere to write at all — the card hasn't mounted
+    // yet (mushroom/button-card build their internal ha-card asynchronously).
+    // The gate follows the write decision above rather than "did we see a
+    // shadow root": a card whose only target is a light-DOM `ha-card` has been
+    // reached, and re-walking it three more times would achieve nothing.
+    // Capped tight: 3× 200 ms (= 600 ms) covers every card I've tested. The old
+    // 10× 500 ms (= 5 s) loop kept spamming `walkShadowAndLight` long after a
+    // stuck card had given up, masking real perf issues.
+    const wroteSomewhere = shadowRoots.length > 0 || !!lightDomCard;
+    if (!wroteSomewhere && attempt < 3) {
       const id = setTimeout(() => {
         this._retryTimeouts.delete(id);
         if (!this.isConnected) return;
