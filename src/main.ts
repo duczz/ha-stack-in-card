@@ -473,7 +473,14 @@ export default class StackInCard extends LitElement implements LovelaceCard {
 
   private _stripMargin(el: any): void {
     if (!el || this._config?.keep?.margin) return;
-    if (el.style) el.style.margin = '0px';
+    if (!el.style) return;
+    el.style.margin = '0px';
+    // HA's vertical stack no longer spaces its children with margins — its
+    // `#root` is a flex container with `row-gap: 8px`. Zeroing the margin
+    // alone therefore left a visible gap between every pair of cards, which
+    // is precisely what this card exists to remove. Horizontal stacks already
+    // compute to `column-gap: 0`, so this is a no-op there.
+    el.style.gap = '0px';
   }
 
   private _applyCardStyle(haCard: HTMLElement, withBackground: boolean): void {

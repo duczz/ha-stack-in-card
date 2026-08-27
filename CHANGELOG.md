@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.0.5] — unreleased
+
+### 🐛 Bug Fixes
+
+- **Runtime:** Stacked cards sit flush against each other again. Home Assistant
+  no longer spaces the cards in a vertical stack with margins — its `#root` is
+  a flex container using `row-gap`. This card only ever zeroed the margin, so
+  an 8px gap remained between every pair of cards: exactly what the card
+  exists to remove. Measured on a live instance, in every configuration.
+- **Runtime:** `keep.margin` does something again. Because the spacing it was
+  meant to preserve had moved to `row-gap`, the option had quietly become a
+  no-op — the gap stayed either way. It now keeps that gap, and is the only
+  setting that does.
+
+Horizontal stacks were unaffected: they already compute to `column-gap: 0`.
+
 ## [2.0.4] — 2026-08-27
 
 ### ⚠️ Behaviour change — custom CSS is scoped more tightly
