@@ -145,7 +145,15 @@ cards:
 
 ### Per-child CSS
 
-Lives on each child's own config as `stack_in_card_styles`. Injected into that child's shadow DOM only — doesn't leak to siblings.
+Lives on each child's own config as `stack_in_card_styles`. Injected into that child's shadow DOM.
+
+> **Scope, precisely.** The CSS is written into every shadow root inside that child, so it reaches the card's own `ha-card` wherever it mounts — and stays inside that card. Shadow DOM does the isolating, not the selector.
+>
+> One exception: a card that keeps its `ha-card` *outside* any shadow DOM. There is nowhere private to put the CSS, so it goes into the scope the child shares with its siblings — and then it can affect them, whatever the selector, `ha-card { }` included. Almost every card has a shadow DOM, so this is rare, but it is why per-child CSS cannot promise isolation unconditionally.
+>
+> A card that renders neither a shadow DOM nor an `ha-card` receives no per-child CSS at all — there is nothing to aim at, and the previous catch-all styled the entire stack. If you hit this, please open an issue naming the card.
+>
+> A child that is itself a `custom:stack-in-card` is special: the field on it is *that card's* own stack CSS, applied to its `ha-card` alone. To style the cards inside it, use their own `stack_in_card_styles`.
 
 ```yaml
 type: custom:stack-in-card

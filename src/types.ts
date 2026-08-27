@@ -37,7 +37,19 @@ export interface KeepConfig {
 /**
  * Child card config: a regular Lovelace card config that may additionally
  * carry a `stack_in_card_styles` string. The CSS in that string is injected
- * into the child card's shadow DOM only — it does not leak to sibling cards.
+ * into every shadow root inside that child card, and stays there — the shadow
+ * boundary does the isolating, not the selector.
+ *
+ * A card that keeps its `ha-card` in the light DOM is the exception: there is
+ * nowhere private to put the CSS, so it goes into the scope the child shares
+ * with its siblings and can reach them, whatever the selector — `ha-card { }`
+ * included, since a sibling's light-DOM `ha-card` sits in that same scope. A
+ * card that renders neither a shadow DOM nor an `ha-card` receives nothing:
+ * there is no way to know what it wants styled, and the old catch-all styled
+ * the whole stack.
+ *
+ * On a child that is itself a stack-in-card the field means something else:
+ * it is that card's own stack CSS, handed through untouched.
  *
  * The field is namespaced (`stack_in_card_*`) to avoid clashing with cards
  * like bubble-card or button-card that use their own `styles:` field.
