@@ -21,6 +21,12 @@ outer_padding: false }`. Note the second key: `keep.margin` on its own also
 switches `outer_padding` on, which would add 8px around the stack that wasn't
 there before.
 
+This also covers the `ha-card { margin: … }` rule suggested in the v2.0.4 notes
+as a replacement for `hui-card { margin: … }`. That swap was exact at the time
+— both measured 16px between cards — but the arithmetic changed here: with the
+8px base gap gone, the same rule now yields 8px. Add the `keep` block above to
+get back to where you were.
+
 ## [2.0.4] — 2026-08-27
 
 ### ⚠️ Behaviour change — custom CSS is scoped more tightly
