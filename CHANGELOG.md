@@ -16,6 +16,11 @@
 
 Horizontal stacks were unaffected: they already compute to `column-gap: 0`.
 
+**If you preferred the spacing,** put it back with `keep: { margin: true,
+outer_padding: false }`. Note the second key: `keep.margin` on its own also
+switches `outer_padding` on, which would add 8px around the stack that wasn't
+there before.
+
 ## [2.0.4] — 2026-08-27
 
 ### ⚠️ Behaviour change — custom CSS is scoped more tightly
