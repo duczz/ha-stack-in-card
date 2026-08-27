@@ -187,6 +187,14 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     // style pass on every Lit update.
     if (!changedProperties.has('_card') && !changedProperties.has('_config')) return;
 
+    // Mother CSS goes into our OWN shadow root and doesn't depend on the inner
+    // stack existing. An empty stack-in-card (`cards: []`) renders a
+    // placeholder that is just as much ours to style — but `_card` stays
+    // undefined, and every other style path bails on that, so the CSS silently
+    // did nothing until the first child was added. Cheap to run twice: the
+    // style pass calls this again, and it only writes when the text differs.
+    this._injectMotherStyle();
+
     if (!this._card) return;
     this._scheduleStyleApplication();
   }

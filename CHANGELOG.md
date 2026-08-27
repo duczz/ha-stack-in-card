@@ -56,6 +56,10 @@ check yours if either applies:
   unconditionally, after which the no-op filter concluded nothing had changed
   and dropped the edit without an event or an error. The re-attach still runs
   for ordinary child cards, whose form-based HA editors do drop unknown keys.
+- **Runtime:** The stack card's own CSS now applies to an empty stack too.
+  With `cards: []` there is no inner stack, and every style path bailed on
+  that — so styling a stack card before adding any children silently did
+  nothing, and the CSS only started working once the first child appeared.
 - **Editor:** A nested `stack-in-card` no longer shows two identically labelled
   "Custom CSS — Card N" sections, one of which silently did nothing. The outer
   editor now points to the nested card's own CSS box instead of offering a
