@@ -299,3 +299,44 @@ describe('editor: the re-attach must not swallow a nested card edit', () => {
     ed.remove();
   });
 });
+
+describe('the stack is seamless: gaps between cards are removed', () => {
+  function stackWithRoot(el: any) {
+    // Mimics HA's vertical stack: a flex `#root` inside the card's shadow
+    // root, holding one wrapper per child card.
+    const stack: any = document.createElement('div');
+    stack.attachShadow({ mode: 'open' });
+    const root = document.createElement('div');
+    root.id = 'root';
+    root.style.gap = '8px';
+    stack.shadowRoot.appendChild(root);
+    root.appendChild(childWithShadow());
+    el._card = stack;
+    return root;
+  }
+
+  it('zeroes the row gap, not just the margin', () => {
+    const el = document.createElement('stack-in-card') as any;
+    el._config = { type: 'custom:stack-in-card', cards: [], keep: {} };
+    const root = stackWithRoot(el);
+
+    el._walkChildren(el._card, false);
+
+    // Margin alone is not enough: HA spaces stacked cards with `row-gap` on
+    // `#root` these days, so zeroing the margin left the 8px gap the card is
+    // supposed to remove.
+    expect(root.style.margin).toBe('0px');
+    expect(root.style.gap).toBe('0px');
+  });
+
+  it('leaves both alone when keep.margin is set', () => {
+    const el = document.createElement('stack-in-card') as any;
+    el._config = { type: 'custom:stack-in-card', cards: [], keep: { margin: true } };
+    const root = stackWithRoot(el);
+
+    el._walkChildren(el._card, false);
+
+    expect(root.style.margin).toBe('');
+    expect(root.style.gap).toBe('8px');
+  });
+});
