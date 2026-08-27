@@ -141,6 +141,26 @@ describe('a nested stack-in-card owns its own stack_in_card_styles', () => {
   });
 });
 
+describe('mother CSS does not depend on the inner stack existing', () => {
+  it('applies to an empty stack-in-card', async () => {
+    const el = document.createElement('stack-in-card') as any;
+    el.setConfig({ type: 'custom:stack-in-card', cards: [], stack_in_card_styles: CSS });
+    el.hass = { states: {} };
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    // `cards: []` leaves `_card` undefined, and every style path bails on that.
+    // The mother CSS lives in our own shadow root though, so it has to be
+    // written anyway — otherwise styling a stack before adding any children
+    // silently does nothing and only starts working once a child appears.
+    const tag = el.shadowRoot.getElementById('stack-in-card-mother-style');
+    expect(tag).toBeTruthy();
+    expect(tag.textContent).toBe(CSS);
+
+    el.remove();
+  });
+});
+
 describe('editor labels the stack-CSS panel by nesting', () => {
   function editor(cfg: any) {
     const ed = document.createElement('stack-in-card-editor') as any;
