@@ -308,35 +308,63 @@ describe('the stack is seamless: gaps between cards are removed', () => {
     stack.attachShadow({ mode: 'open' });
     const root = document.createElement('div');
     root.id = 'root';
-    root.style.gap = '8px';
+    // No inline gap: HA sets it from its own stylesheet, so `style.gap` starts
+    // empty and stays empty unless we write it.
     stack.shadowRoot.appendChild(root);
     root.appendChild(childWithShadow());
     el._card = stack;
     return root;
   }
 
-  it('zeroes the row gap, not just the margin', () => {
+  async function rendered(keep: any) {
+    (window as any).loadCardHelpers = async () => ({
+      createCardElement: () => {
+        const card: any = document.createElement('div');
+        card.attachShadow({ mode: 'open' });
+        const root = document.createElement('div');
+        root.id = 'root';
+        card.shadowRoot.appendChild(root);
+        card.setConfig = () => {};
+        card.getCardSize = () => 1;
+        return card;
+      },
+    });
+    const el = document.createElement('stack-in-card') as any;
+    el.setConfig({ type: 'custom:stack-in-card', cards: [{ type: 'markdown' }], keep });
+    el.hass = { states: {} };
+    document.body.appendChild(el);
+    await new Promise((r) => setTimeout(r, 80));
+    return el;
+  }
+
+  it('never writes the gap shorthand — that would kill the variable', () => {
     const el = document.createElement('stack-in-card') as any;
     el._config = { type: 'custom:stack-in-card', cards: [], keep: {} };
     const root = stackWithRoot(el);
 
     el._walkChildren(el._card, false);
 
-    // Margin alone is not enough: HA spaces stacked cards with `row-gap` on
-    // `#root` these days, so zeroing the margin left the 8px gap the card is
-    // supposed to remove.
     expect(root.style.margin).toBe('0px');
-    expect(root.style.gap).toBe('0px');
+    // `#root { gap: 0 }` inline overrides HA's own
+    // `gap: var(--vertical-stack-card-gap, var(--stack-card-gap, 8px))`, so a
+    // user's `--stack-card-gap` override stops working. Set the variable
+    // instead — see `_applyGapVariable`.
+    expect(root.style.gap).toBe('');
   });
 
-  it('leaves both alone when keep.margin is set', () => {
-    const el = document.createElement('stack-in-card') as any;
-    el._config = { type: 'custom:stack-in-card', cards: [], keep: { margin: true } };
-    const root = stackWithRoot(el);
+  it('zeroes the gap through HA\'s custom property', async () => {
+    const el = await rendered({});
+    const ourCard = el.shadowRoot.querySelector('ha-card') as HTMLElement;
 
-    el._walkChildren(el._card, false);
+    expect(ourCard.style.getPropertyValue('--stack-card-gap')).toBe('0px');
+    el.remove();
+  });
 
-    expect(root.style.margin).toBe('');
-    expect(root.style.gap).toBe('8px');
+  it('leaves the property unset when keep.margin is on', async () => {
+    const el = await rendered({ margin: true });
+    const ourCard = el.shadowRoot.querySelector('ha-card') as HTMLElement;
+
+    expect(ourCard.style.getPropertyValue('--stack-card-gap')).toBe('');
+    el.remove();
   });
 });
