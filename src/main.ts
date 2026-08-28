@@ -265,6 +265,7 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     }
 
     // Pass 1: strip borders/backgrounds/margins on child cards
+    this._applyGapVariable();
     this._walkChildren(this._card, false);
     this._injectChildStyles();
     this._injectMotherStyle();
@@ -475,12 +476,34 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     if (!el || this._config?.keep?.margin) return;
     if (!el.style) return;
     el.style.margin = '0px';
-    // HA's vertical stack no longer spaces its children with margins — its
-    // `#root` is a flex container with `row-gap: 8px`. Zeroing the margin
-    // alone therefore left a visible gap between every pair of cards, which
-    // is precisely what this card exists to remove. Horizontal stacks already
-    // compute to `column-gap: 0`, so this is a no-op there.
-    el.style.gap = '0px';
+    // Deliberately NOT `el.style.gap = '0px'` here — see _applyGapVariable.
+  }
+
+  /** Close the gap HA leaves between stacked cards.
+   *
+   * HA's stack spaces its children with
+   * `gap: var(--vertical-stack-card-gap, var(--stack-card-gap, 8px))` on its
+   * `#root`, so zeroing the margin alone left 8px between every pair of cards
+   * — precisely what this card exists to remove.
+   *
+   * We set the custom property rather than the `gap` shorthand, and we set it
+   * on our own <ha-card> so it inherits down into the stack's shadow tree.
+   * Writing `#root { gap: 0 }` inline works too, but it *overrides* HA's rule
+   * and kills the variable with it: a user's
+   * `ha-card { --stack-card-gap: 2px !important }` in the stack's own CSS box
+   * then does nothing. Setting the variable keeps HA's mechanism intact, and
+   * an !important author rule still wins over our inline value — measured.
+   *
+   * `--vertical-stack-card-gap` is left alone: it sits ahead of ours in that
+   * var() chain, so a theme setting it deliberately keeps the last word. */
+  private _applyGapVariable(): void {
+    const ourCard = this.shadowRoot?.querySelector('ha-card') as HTMLElement | null;
+    if (!ourCard) return;
+    if (this._config?.keep?.margin) {
+      ourCard.style.removeProperty('--stack-card-gap');
+    } else {
+      ourCard.style.setProperty('--stack-card-gap', '0px');
+    }
   }
 
   private _applyCardStyle(haCard: HTMLElement, withBackground: boolean): void {

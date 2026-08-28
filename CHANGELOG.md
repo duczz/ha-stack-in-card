@@ -5,10 +5,15 @@
 ### 🐛 Bug Fixes
 
 - **Runtime:** Stacked cards sit flush against each other again. Home Assistant
-  no longer spaces the cards in a vertical stack with margins — its `#root` is
-  a flex container using `row-gap`. This card only ever zeroed the margin, so
-  an 8px gap remained between every pair of cards: exactly what the card
-  exists to remove. Measured on a live instance, in every configuration.
+  no longer spaces the cards in a vertical stack with margins — its container
+  is a flex layout using `gap: var(--vertical-stack-card-gap,
+  var(--stack-card-gap, 8px))`. This card only ever zeroed the margin, so an
+  8px gap remained between every pair of cards: exactly what the card exists to
+  remove. It now sets `--stack-card-gap` to `0` instead of writing the `gap`
+  shorthand — that keeps HA's own rule working, so
+  `ha-card { --stack-card-gap: 2px !important }` in the stack card's CSS box
+  still sets your own spacing. Measured on a live instance: `0px` by default,
+  `2px` with that override.
 - **Runtime:** `keep.margin` does something again. Because the spacing it was
   meant to preserve had moved to `row-gap`, the option had quietly become a
   no-op — the gap stayed either way. It now keeps that gap, and is the only
@@ -16,10 +21,17 @@
 
 Horizontal stacks were unaffected: they already compute to `column-gap: 0`.
 
-**If you preferred the spacing,** put it back with `keep: { margin: true,
-outer_padding: false }`. Note the second key: `keep.margin` on its own also
-switches `outer_padding` on, which would add 8px around the stack that wasn't
-there before.
+**If you preferred the spacing,** you have two ways back. For HA's original
+8px, use `keep: { margin: true, outer_padding: false }` — note the second key,
+because `keep.margin` on its own also switches `outer_padding` on, which would
+add 8px around the stack that wasn't there before. For any other value, set
+`--stack-card-gap` in the stack card's own CSS box:
+
+```css
+ha-card {
+  --stack-card-gap: 2px !important;
+}
+```
 
 This also covers the `ha-card { margin: … }` rule suggested in the v2.0.4 notes
 as a replacement for `hui-card { margin: … }`. That swap was exact at the time
