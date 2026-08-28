@@ -19,6 +19,13 @@
   no-op — the gap stayed either way. It now keeps that gap, and is the only
   setting that does.
 
+- **Docs:** The README tip about `!important` was wrong. It claimed
+  `border-radius` and `box-shadow` usually don't need it — they do, because the
+  card strips all three properties by writing them inline, and an inline style
+  outranks a normal rule. The matching `--ha-card-*` theme variables are
+  ignored for those three for the same reason. Measured and corrected, in the
+  README and in the editor's own hint.
+
 Horizontal stacks were unaffected: they already compute to `column-gap: 0`.
 
 **If you preferred the spacing,** you have two ways back. For HA's original

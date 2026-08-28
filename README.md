@@ -178,9 +178,20 @@ Because per-child CSS lives on the child config, it travels with the card across
 
 ### Tips
 
-- `background` needs `!important` to override HA's `--ha-card-background` theme variable. `border-radius`, `box-shadow`, and most other properties usually don't.
+- **Putting back what the card strips needs `!important`.** `background`, `box-shadow` and `border-radius` are removed from child cards by writing them as inline styles, and an inline style outranks a normal rule. Measured: `border-radius: 12px !important` in a child's CSS box gives 12px, without `!important` it stays 0.
+
+  The matching HA theme variable does **not** work for these three — `--ha-card-border-radius: 12px` is silently ignored, because our inline value never consults it. Write the property itself:
+
+  ```css
+  ha-card {
+    border-radius: 12px !important;
+  }
+  ```
+
+  If you want the property back on *every* child rather than one, use the `keep` options instead — that skips the stripping altogether and leaves the theme variables working.
+- **The spacing between cards is the exception**: it is set through HA's own `--stack-card-gap`, so no `!important` gymnastics — `ha-card { --stack-card-gap: 2px !important }` in the stack card's CSS box just works, and so does any other value.
 - The visual editor's CSS editors use `mode="yaml"` because HA's `<ha-code-editor>` doesn't ship a CSS mode. Highlighting won't perfectly match CSS, but everything works.
-- Prefer HA's CSS variables (`--primary-color`, `--card-background-color`, etc.) so your stack respects the active theme.
+- Prefer HA's CSS variables (`--primary-color`, `--card-background-color`, etc.) so your stack respects the active theme — with the caveat above for the three stripped properties.
 - Copying or cutting a child card in the editor puts its full config — including the `stack_in_card_styles` field — onto Home Assistant's shared clipboard. Pasting it back into another stack-in-card keeps the CSS. Pasting it into a plain dashboard card works too, but some cards with strict config validation may reject the extra `stack_in_card_styles` key; just delete that key if a paste target complains.
 
 #### Keep the background of one specific child
