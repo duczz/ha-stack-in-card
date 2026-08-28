@@ -180,7 +180,7 @@ Because per-child CSS lives on the child config, it travels with the card across
 
 - **Putting back what the card strips needs `!important`.** `background`, `box-shadow` and `border-radius` are removed from child cards by writing them as inline styles, and an inline style outranks a normal rule. Measured: `border-radius: 12px !important` in a child's CSS box gives 12px, without `!important` it stays 0.
 
-  The matching HA theme variable does **not** work for these three — `--ha-card-border-radius: 12px` is silently ignored, because our inline value never consults it. Write the property itself:
+  The matching HA theme variable is no help here either: `--ha-card-border-radius: 12px` does nothing, and not because of this card — measured on a live instance, setting it on the card, on its wrapper, or at theme level all leave the radius untouched. Write the property itself:
 
   ```css
   ha-card {
