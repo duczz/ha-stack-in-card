@@ -856,6 +856,14 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
                         reach them; a card with neither receives nothing. Almost every
                         card has a shadow DOM.
                       </p>
+                      <p class="styles-hint">
+                        To put back a <code>background</code>, <code>box-shadow</code> or
+                        <code>border-radius</code> this card strips, write the property
+                        with <code>!important</code> — the matching
+                        <code>--ha-card-*</code> variable is ignored, because the stripped
+                        value is set inline. The <em>Keep</em> options above skip the
+                        stripping entirely.
+                      </p>
                       <div class="styles-editor">
                         <ha-code-editor
                           mode="yaml"
