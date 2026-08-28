@@ -22,9 +22,10 @@
 - **Docs:** The README tip about `!important` was wrong. It claimed
   `border-radius` and `box-shadow` usually don't need it — they do, because the
   card strips all three properties by writing them inline, and an inline style
-  outranks a normal rule. The matching `--ha-card-*` theme variables are
-  ignored for those three for the same reason. Measured and corrected, in the
-  README and in the editor's own hint.
+  outranks a normal rule. The matching `--ha-card-*` theme variables are no
+  substitute either — measured, they do not drive a child card's radius,
+  background or shadow wherever you set them, so `!important` on the property
+  is the way. Corrected in the README and in the editor's own hint.
 
 Horizontal stacks were unaffected: they already compute to `column-gap: 0`.
 
