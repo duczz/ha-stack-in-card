@@ -16,7 +16,7 @@ import {
   mdiTune,
 } from '@mdi/js';
 
-import styles from './styles.css';
+import styles from './styles';
 import fireEvent from './fireEvent';
 import {
   deepClone,

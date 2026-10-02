@@ -1,5 +1,30 @@
 # Changelog
 
+## [Unreleased]
+
+### 🐛 Bug Fixes
+
+- **Editor:** Loading the card no longer adds a global `<style>` element to
+  the page. The build used to inject a second copy of the editor's styles
+  into `document.head`, with generic selectors such as `.tab` and `.tabs`
+  that could match any element in the page's main document (outside shadow
+  roots). The editor never used that copy — its styles live in its own shadow
+  root, unchanged.
+
+### 🧪 Internal
+
+- Editor styles are now plain CSS in a Lit `css` tag (`src/styles.ts`), the
+  way Home Assistant's own cards are written. The PostCSS build chain is gone
+  (`rollup-plugin-postcss`, `postcss-preset-env`, `rollup-plugin-postcss-lit`).
+  It only added fallbacks for browsers without CSS custom properties and
+  vendor prefixes; the one prefix Safari still needs (`-webkit-user-select`)
+  is now written by hand.
+- Removed `cross-env` and `@rollup/plugin-commonjs`. The build pins Lit's
+  production export via `exportConditions` instead, so a `NODE_ENV=development`
+  in the shell can no longer pull Lit's dev build into a release.
+- Tests no longer stub the stylesheet; the editor's real styles load in tests.
+- `node_modules` shrinks from 409 to 188 packages (about 8,200 to 5,000 files).
+
 ## [2.0.5] — 2026-08-27
 
 ### 🐛 Bug Fixes

@@ -16,7 +16,7 @@ describe('test infra smoke', () => {
     expect(typeof requestAnimationFrame).toBe('function');
   });
 
-  it('can import the runtime module (pulls editor + styles.css + package.json)', async () => {
+  it('can import the runtime module (pulls editor + styles + package.json)', async () => {
     const mod = await import('../main');
     expect(mod.default).toBeTruthy();
   });

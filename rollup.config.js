@@ -2,45 +2,26 @@ import resolve from '@rollup/plugin-node-resolve';
 import typescript from '@rollup/plugin-typescript';
 import json from '@rollup/plugin-json';
 import terser from '@rollup/plugin-terser';
-import commonjs from '@rollup/plugin-commonjs';
-import postCSS from 'rollup-plugin-postcss';
-import postCSSLit from 'rollup-plugin-postcss-lit';
-import postCSSPresetEnv from 'postcss-preset-env';
 import inject from 'rollup-plugin-inject-process-env';
 
 const dev = !!process.env.ROLLUP_WATCH;
 
 const plugins = [
-  resolve({ browser: true }),
-  commonjs(),
+  // Pin Lit's production export. Without it, node-resolve picks the
+  // `development` condition whenever NODE_ENV is set to anything else, and
+  // Lit's dev build (larger, with dev-mode warnings) lands in the bundle.
+  resolve({ browser: true, exportConditions: ['production'] }),
   json(),
-  inject(
-    {
-      BUILD_TIME: new Date().toLocaleString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-    },
-    { exclude: '**/*.css' },
-  ),
-  typescript({ sourceMap: dev, inlineSources: dev }),
-  postCSS({
-    plugins: [
-      postCSSPresetEnv({
-        stage: 1,
-        features: {
-          'nesting-rules': true,
-          'custom-media-queries': true,
-        },
-      }),
-    ],
-    inject: true,
-    extract: false,
+  inject({
+    BUILD_TIME: new Date().toLocaleString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
   }),
-  postCSSLit(),
+  typescript({ sourceMap: dev, inlineSources: dev }),
 ];
 
 export default [
