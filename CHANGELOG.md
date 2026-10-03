@@ -1,9 +1,25 @@
 # Changelog
 
-## [Unreleased]
+## [2.0.6] — 2026-10-03
+
+### ✨ Features
+
+- **Editor:** The Keep options take less height. Each row of toggles was 80px
+  tall, of which the gap between rows was 24px; it is now 60px, with a 4px gap
+  between rows. The rows stay this compact at any editor width. Measured in
+  Home Assistant 2026.9.3. The toggles keep their columns and their labels
+  wrap exactly as before.
 
 ### 🐛 Bug Fixes
 
+- **Editor:** `keep.outer_padding` follows `keep.margin` again, as documented.
+  The editor wrote `outer_padding: false` into the config on every change, even
+  when you had only typed a title. Switching on "Keep margin" therefore never
+  added the 8px outer padding that it adds in YAML. The editor now writes
+  `outer_padding` only when you change that toggle yourself. Switching it off
+  while margin is kept still works. Configs that already contain
+  `outer_padding: false` are left as they are. If you didn't set that on
+  purpose, switch "Keep outer padding" on once, or delete the key.
 - **Editor:** Loading the card no longer adds a global `<style>` element to
   the page. The build used to inject a second copy of the editor's styles
   into `document.head`, with generic selectors such as `.tab` and `.tabs`
