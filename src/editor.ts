@@ -83,24 +83,19 @@ const SCHEMA = [
       },
     },
   },
-  {
-    type: 'expandable',
-    title: 'Keep options',
-    iconPath: mdiTune,
-    schema: [
-      {
-        type: 'grid',
-        column_min_width: '160px',
-        schema: [
-          { name: 'keep.background', selector: { boolean: {} } },
-          { name: 'keep.box_shadow', selector: { boolean: {} } },
-          { name: 'keep.border_radius', selector: { boolean: {} } },
-          { name: 'keep.margin', selector: { boolean: {} } },
-          { name: 'keep.outer_padding', selector: { boolean: {} } },
-        ],
-      },
-    ],
-  },
+];
+
+// The Keep toggles are rendered outside the mother form, one ha-form each, in
+// our own grid (.keep-grid). Inside ha-form they sat in a `grid` whose row gap
+// is HA's 24px (`--ha-space-6`) on top of the 56px min-height of every boolean
+// selector — 80px per row (measured in HA 2026.9.3). Our grid sets the row
+// gap itself: 60px per row, at any editor width.
+export const KEEP_FIELDS = [
+  { name: 'keep.background', selector: { boolean: {} } },
+  { name: 'keep.box_shadow', selector: { boolean: {} } },
+  { name: 'keep.border_radius', selector: { boolean: {} } },
+  { name: 'keep.margin', selector: { boolean: {} } },
+  { name: 'keep.outer_padding', selector: { boolean: {} } },
 ];
 
 const LABELS: Record<string, string> = {
@@ -278,22 +273,22 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
     if (updated.mode && updated.mode !== 'vertical') copy.mode = updated.mode;
     else delete (copy as any).mode;
 
-    const keepPaths = [
-      'keep.background',
-      'keep.box_shadow',
-      'keep.border_radius',
-      'keep.margin',
-      'keep.outer_padding',
-    ];
+    const keepPaths = ['keep.background', 'keep.box_shadow', 'keep.border_radius', 'keep.margin'];
     for (const path of keepPaths) {
-      if (updated[path] === true) {
-        setNested(copy, path, true);
-      } else if (path === 'keep.outer_padding' && updated[path] === false) {
-        // We must explicitly save false so the backwards-compat default doesn't kick in
-        setNested(copy, path, false);
-      } else {
-        deleteNested(copy, path);
-      }
+      if (updated[path] === true) setNested(copy, path, true);
+      else deleteNested(copy, path);
+    }
+
+    // outer_padding defaults to `margin` (README; runtime fallback in main.ts).
+    // The form always shows a value for it, so only a change the user made to
+    // THIS toggle may be written: untouched, the stored state stays as it is
+    // (absent keeps following margin). Touched, the key is dropped when it
+    // matches the default and saved explicitly — `false` included — when not,
+    // so it can still be switched off while margin is kept.
+    const outer = updated['keep.outer_padding'];
+    if (outer !== this._buildFormData()['keep.outer_padding']) {
+      if (outer === !!updated['keep.margin']) deleteNested(copy, 'keep.outer_padding');
+      else setNested(copy, 'keep.outer_padding', !!outer);
     }
     if (copy.keep && Object.keys(copy.keep).length === 0) delete copy.keep;
 
@@ -678,6 +673,24 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
           .computeLabel=${this._computeLabel}
           @value-changed=${this._valueChanged}
         ></ha-form>
+
+        <ha-expansion-panel outlined class="keep-panel">
+          <ha-svg-icon slot="leading-icon" .path=${mdiTune}></ha-svg-icon>
+          <div slot="header" role="heading" aria-level="3">Keep options</div>
+          <div class="panel-content keep-grid">
+            ${KEEP_FIELDS.map(
+              (field) => html`
+                <ha-form
+                  .hass=${this.hass}
+                  .data=${data}
+                  .schema=${[field]}
+                  .computeLabel=${this._computeLabel}
+                  @value-changed=${this._valueChanged}
+                ></ha-form>
+              `,
+            )}
+          </div>
+        </ha-expansion-panel>
 
         <ha-expansion-panel outlined>
           <ha-svg-icon slot="leading-icon" .path=${mdiCodeBraces}></ha-svg-icon>

@@ -45,6 +45,23 @@ export default css`
     padding: 8px 8px 12px;
   }
 
+  /* Keep toggles: same columns as HA's form grid (160px min, 8px column gap),
+     but our own 4px row gap instead of HA's 24px. min() keeps a single column
+     from overflowing a panel narrower than 160px. Panel padding copies HA's
+     ha-form-expandable (content padding 0 on the panel, 12px inside) — with our
+     usual 8px + 8px the columns lose ~3px and "Keep background" wraps. */
+  .keep-panel {
+    --expansion-panel-content-padding: 0;
+  }
+
+  .keep-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+    column-gap: 8px;
+    row-gap: 4px;
+    padding: 12px;
+  }
+
   .styles-editor {
     border: 1px solid var(--divider-color, #e0e0e0);
     border-radius: 6px;
