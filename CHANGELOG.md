@@ -1,5 +1,49 @@
 # Changelog
 
+## [2.0.7] — 2026-10-06
+
+### 🐛 Bug Fixes
+
+- **Runtime:** One child card can no longer leave the other children framed.
+  Some cards render their `ha-card` without a shadow root. The stack mistook
+  such a card's `ha-card` for its own, styled only that one and never looked
+  at the other children, so they kept their border radius, shadow and the gap
+  between cards. It now always walks into the stack's children. Measured in
+  Home Assistant 2026.9.3: in a stack of five cards, two ordinary cards kept a
+  `12px` radius next to one such card; now all are `0px`.
+- **Runtime:** Children with visibility conditions show up while you edit the
+  dashboard. Home Assistant reports edit mode to a card through `preview`, and
+  its own stacks pass it to their children, which then show even when their
+  condition is not met. This card did not, so those children stayed hidden in
+  the editor. It now passes `preview` on. Measured on a dashboard with eight
+  stack-in-cards: a child with a `visibility` condition was hidden in edit
+  mode before and is shown now.
+- **Runtime:** A card that mounts its `ha-card` late is stripped too. When an
+  entity appears after the first render, cards such as `tile` or the Mushroom
+  entity card replace their content inside their own shadow root. The stack's
+  observer stops at that boundary, so the new `ha-card` kept its border radius,
+  shadow and background. The stack now also watches the shadow root of each
+  child and reacts only when an `ha-card` arrives. Measured: `tile` and the
+  Mushroom entity card go from `12px` to `0px` once the entity shows up. With a
+  clock, mini-graph, apexcharts and entities cards updating, no style pass runs
+  while idle.
+- **Editor:** The English fallback labels work now. `hass.localize` returns an
+  empty string for a missing translation, not `undefined`, so the `??`
+  fallback never applied. It is `||` now.
+
+### ⚠️ Known limits
+
+- The warning card Home Assistant shows for a missing entity keeps its frame.
+- A card that rebuilds its `ha-card` on every update is framed until the next
+  style pass has run. Measured with a test card: about 45% of the time at one
+  update per second. Passes are capped at about one per second.
+
+### 🧪 Internal
+
+- A style pass no longer reattaches the observers when the card is removed
+  while the pass is running.
+- Tests: 50 → 70.
+
 ## [2.0.6] — 2026-10-03
 
 ### ✨ Features
