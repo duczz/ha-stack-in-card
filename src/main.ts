@@ -283,9 +283,14 @@ export default class StackInCard extends LitElement implements LovelaceCard {
 
     // Wait for the stack to render its children
     const stack = this._card as unknown as LitElement;
+    // The element may be detached, or its stack swapped, while we await. Bail
+    // out then: finishing would re-attach both observers to a dead tree. A
+    // reattach (connectedCallback) or the new stack schedules a fresh pass.
+    const abandoned = () => !this.isConnected || (this._card as unknown) !== stack;
     if (stack.updateComplete) {
       await stack.updateComplete;
     }
+    if (abandoned()) return;
 
     // Pass 1: strip borders/backgrounds/margins on child cards
     this._applyGapVariable();
@@ -296,6 +301,7 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     // Pass 2: re-walk after a microtask + frame to catch late-mounted shadow
     // roots, this time applying the background override too.
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    if (abandoned()) return;
     this._walkChildren(this._card, true);
     if (this._config?.keep?.outer_padding && this._card?.shadowRoot) {
       const stackRoot = this._card.shadowRoot.getElementById('root');
@@ -333,9 +339,10 @@ export default class StackInCard extends LitElement implements LovelaceCard {
   }
 
   /**
-   * Watch the shadow root of every child card the walker looks into, so an
-   * ha-card that mounts there after pass 2 gets styled too. Re-collected on
-   * every pass: rebuilt children (preview switch, ll-rebuild) bring new roots.
+   * Watch the shadow root of each child card (and of the children of nested
+   * stacks), so an ha-card that mounts there after pass 2 gets styled too.
+   * Re-collected on every pass: children that hui-card swaps (conditional
+   * cards, ll-rebuild) bring new roots.
    */
   private _observeChildRoots(): void {
     const root = this._card?.shadowRoot?.getElementById('root');
@@ -351,8 +358,10 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     );
   }
 
-  /** Shadow roots of the child cards, in the places `_walkChildren` looks:
-   * the child element's own root, plus the children of a nested stack. */
+  /** Shadow roots of the child cards: each child element's own root, plus the
+   * children of a nested stack. Not covered: the roots `_walkChildren` reaches
+   * through `#root` / `#card` of a non-stack card without an ha-card of its own
+   * (rare wrapper cards). */
   private _collectChildRoots(from: Element, acc: ShadowRoot[] = []): ShadowRoot[] {
     for (const el of Array.from(from.children)) {
       if (el.tagName === 'STACK-IN-CARD') continue;
@@ -544,8 +553,9 @@ export default class StackInCard extends LitElement implements LovelaceCard {
         const root =
           el.shadowRoot.getElementById('root') || el.shadowRoot.getElementById('card');
         if (root) {
+          // `#root` may itself be the stack's ha-card (`<ha-card id="root">`).
           const own = Array.from(el.shadowRoot.querySelectorAll('ha-card')).find(
-            (c) => !root.contains(c as Node),
+            (c) => c === root || !root.contains(c as Node),
           );
           if (own) this._applyCardStyle(own as HTMLElement, withBackground);
           this._stripMargin(root);

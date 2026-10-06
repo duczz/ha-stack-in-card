@@ -321,7 +321,7 @@ describe('child shadow roots — an ha-card mounted after the pass gets styled',
     el._innerObserver.disconnect();
   });
 
-  it('ignores everything else: rows, SVG, our own <style>', () => {
+  it('ignores anything without an ha-card: rows, SVG, a <style> tag', () => {
     const el = document.createElement('stack-in-card') as any;
     const style = document.createElement('style');
     style.id = el._childStyleTagId;
@@ -344,5 +344,193 @@ describe('child shadow roots — an ha-card mounted after the pass gets styled',
     expect(el._innerObserver).toBeTruthy();
     el.disconnectedCallback();
     expect(el._innerObserver).toBeUndefined();
+  });
+});
+
+describe('_walkChildren — a nested stack is always descended into', () => {
+  it('styles children of a nested *-stack-card, including a light-DOM ha-card', () => {
+    const el = document.createElement('stack-in-card') as any;
+    el._config = { keep: {} };
+    const outer = stackOf(['shadow']);
+
+    // A nested hui-vertical-stack-card whose child keeps its ha-card in light DOM.
+    const nested = document.createElement('hui-vertical-stack-card');
+    const nestedSr = nested.attachShadow({ mode: 'open' });
+    const nestedRoot = document.createElement('div');
+    nestedRoot.id = 'root';
+    nestedSr.appendChild(nestedRoot);
+    const huiCard = document.createElement('hui-card');
+    const child = document.createElement('x-child');
+    const lightCard = document.createElement('ha-card');
+    child.appendChild(lightCard);
+    huiCard.appendChild(child);
+    nestedRoot.appendChild(huiCard);
+    const nestedHui = document.createElement('hui-card');
+    nestedHui.appendChild(nested);
+    outer.root.appendChild(nestedHui);
+
+    el._walkChildren(outer.stack, false);
+    el._walkChildren(outer.stack, true);
+
+    expect(outer.haCards[0].style.borderRadius).toBe('0px');
+    expect(lightCard.style.borderRadius).toBe('0px');
+    expect(nestedRoot.style.margin).toBe('0px');
+  });
+});
+
+describe('observers — teardown and abandoned passes', () => {
+  it('_createStack drops the child-root observer', async () => {
+    const el = document.createElement('stack-in-card') as any;
+    el._config = { type: 'custom:stack-in-card', mode: 'vertical', cards: [], keep: {} };
+    const disconnect = vi.fn();
+    el._innerObserver = { disconnect };
+
+    await el._createStack();
+
+    expect(disconnect).toHaveBeenCalled();
+    expect(el._innerObserver).toBeUndefined();
+  });
+
+  it('a pass on a detached element leaves no observers behind', async () => {
+    const el = document.createElement('stack-in-card') as any;
+    el._config = { type: 'custom:stack-in-card', mode: 'vertical', cards: [{ type: 'markdown' }], keep: {} };
+    const { stack } = stackOf(['shadow']);
+    el._card = stack;
+    expect(el.isConnected).toBe(false);
+
+    await el._applyAllStyles();
+
+    expect(el._childObserver).toBeUndefined();
+    expect(el._innerObserver).toBeUndefined();
+  });
+});
+
+describe('end to end — an ha-card mounted late in a child shadow root', () => {
+  afterEach(() => vi.restoreAllMocks());
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it('gets styled, and the stack then settles without further passes', async () => {
+    // #root > hui-card > x-child; the child's shadow root shows a warning first.
+    const { stack, root } = stackOf([]);
+    const huiCard = document.createElement('hui-card');
+    const child = document.createElement('x-child');
+    const childRoot = child.attachShadow({ mode: 'open' });
+    childRoot.appendChild(document.createElement('hui-warning'));
+    huiCard.appendChild(child);
+    root.appendChild(huiCard);
+
+    const el = document.createElement('stack-in-card') as any;
+    el._config = { type: 'custom:stack-in-card', mode: 'vertical', cards: [{ type: 'markdown' }], keep: {} };
+    el.hass = {};
+    document.body.appendChild(el);
+    const passes = vi.spyOn(el, '_applyAllStyles');
+    el._card = stack;                       // reactive: schedules the first pass
+    await wait(600);
+
+    const late = document.createElement('ha-card');
+    childRoot.appendChild(late);
+    await wait(1200);                       // debounce (150 ms) + two frames
+
+    expect(late.style.borderRadius).toBe('0px');
+
+    const settled = passes.mock.calls.length;
+    await wait(1500);
+    expect(passes.mock.calls.length).toBe(settled);   // no loop
+    el.remove();
+  });
+});
+
+describe('_walkChildren — the stack\'s own ha-card', () => {
+  // Children as in HA: #root > hui-card > x-child (shadow root with an ha-card).
+  const addChild = (root: Element) => {
+    const huiCard = document.createElement('hui-card');
+    const child = document.createElement('x-child');
+    const haCard = document.createElement('ha-card');
+    child.attachShadow({ mode: 'open' }).appendChild(haCard);
+    huiCard.appendChild(child);
+    root.appendChild(huiCard);
+    return haCard;
+  };
+  const walk = (stack: Element) => {
+    const el = document.createElement('stack-in-card') as any;
+    el._config = { keep: {} };
+    el._walkChildren(stack, false);
+    el._walkChildren(stack, true);
+  };
+
+  it('styles an ha-card outside #root and still walks the children', () => {
+    const stack = document.createElement('div');
+    const sr = stack.attachShadow({ mode: 'open' });
+    const own = document.createElement('ha-card');
+    const root = document.createElement('div');
+    root.id = 'root';
+    sr.append(own, root);
+    const childCard = addChild(root);
+
+    walk(stack);
+
+    expect(own.style.borderRadius).toBe('0px');
+    expect(childCard.style.borderRadius).toBe('0px');
+  });
+
+  it('styles an ha-card that wraps #root and still walks the children', () => {
+    const stack = document.createElement('div');
+    const sr = stack.attachShadow({ mode: 'open' });
+    const own = document.createElement('ha-card');
+    const root = document.createElement('div');
+    root.id = 'root';
+    own.appendChild(root);
+    sr.appendChild(own);
+    const childCard = addChild(root);
+
+    walk(stack);
+
+    expect(own.style.borderRadius).toBe('0px');
+    expect(childCard.style.borderRadius).toBe('0px');
+  });
+
+  it('styles an <ha-card id="root"> as the stack\'s own card, and its children', () => {
+    const stack = document.createElement('div');
+    const sr = stack.attachShadow({ mode: 'open' });
+    const root = document.createElement('ha-card');
+    root.id = 'root';
+    sr.appendChild(root);
+    const childCard = addChild(root);
+
+    walk(stack);
+
+    expect(root.style.borderRadius).toBe('0px');
+    expect(childCard.style.borderRadius).toBe('0px');
+  });
+});
+
+describe('child-root filter and abandoned passes — gaps the first tests left', () => {
+  it('ignores an SVG element even when it holds an ha-card', () => {
+    const el = document.createElement('stack-in-card') as any;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    svg.appendChild(document.createElement('ha-card'));
+    expect(svg.querySelector('ha-card')).not.toBeNull();   // the filter, not emptiness, must decide
+    expect(el._mutationsAddHaCard(batch([svg]))).toBe(false);
+  });
+
+  it('a pass abandons itself when the stack is swapped while it waits', async () => {
+    const el = document.createElement('stack-in-card') as any;
+    el._config = { type: 'custom:stack-in-card', mode: 'vertical', cards: [{ type: 'markdown' }], keep: {} };
+    vi.spyOn(el, '_scheduleStyleApplication').mockImplementation(() => {});
+    document.body.appendChild(el);
+
+    let release!: () => void;
+    const first = stackOf(['shadow']).stack as any;
+    first.updateComplete = new Promise<void>((r) => (release = r));
+    el._card = first;
+    const pass = el._applyAllStyles();      // waits on first.updateComplete
+
+    el._card = stackOf(['shadow']).stack;   // a rebuild swaps the stack meanwhile
+    release();
+    await pass;
+
+    expect(el._childObserver).toBeUndefined();
+    expect(el._innerObserver).toBeUndefined();
+    el.remove();
   });
 });
