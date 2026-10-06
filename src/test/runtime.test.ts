@@ -253,3 +253,96 @@ describe('preview — passed on to the inner stack', () => {
     expect(el._card.preview).toBe(true);
   });
 });
+
+describe('child shadow roots — an ha-card mounted after the pass gets styled', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+
+  // #root > hui-card > x-child (shadow root holds a warning, later the card)
+  function lateStack() {
+    const { stack, root } = stackOf([]);
+    const huiCard = document.createElement('hui-card');
+    const child = document.createElement('x-child');
+    const sr = child.attachShadow({ mode: 'open' });
+    sr.appendChild(document.createElement('hui-warning'));
+    huiCard.appendChild(child);
+    root.appendChild(huiCard);
+    return { stack, sr };
+  }
+
+  it('collects the child shadow roots, and the roots under a nested stack', () => {
+    const el = document.createElement('stack-in-card') as any;
+    const { stack, sr } = lateStack();
+
+    const nested = document.createElement('hui-vertical-stack-card');
+    const nestedSr = nested.attachShadow({ mode: 'open' });
+    const nestedRoot = document.createElement('div');
+    nestedRoot.id = 'root';
+    nestedSr.appendChild(nestedRoot);
+    const inner = document.createElement('x-inner');
+    const innerSr = inner.attachShadow({ mode: 'open' });
+    nestedRoot.appendChild(inner);
+    stack.shadowRoot!.getElementById('root')!.appendChild(nested);
+
+    const roots = el._collectChildRoots(stack.shadowRoot!.getElementById('root'));
+    expect(roots).toContain(sr);
+    expect(roots).toContain(nestedSr);
+    expect(roots).toContain(innerSr);
+  });
+
+  it('schedules a pass when a child mounts an ha-card in its own shadow root', async () => {
+    const el = document.createElement('stack-in-card') as any;
+    const { stack, sr } = lateStack();
+    el._card = stack;
+    const spy = vi.spyOn(el, '_scheduleStyleApplication').mockImplementation(() => {});
+
+    el._observeChildRoots();
+    sr.appendChild(document.createElement('ha-card'));
+    await tick();
+
+    expect(spy).toHaveBeenCalledWith(true);
+    el._innerObserver.disconnect();
+  });
+
+  it('also reacts to a wrapper that holds an ha-card', async () => {
+    const el = document.createElement('stack-in-card') as any;
+    const { stack, sr } = lateStack();
+    el._card = stack;
+    const spy = vi.spyOn(el, '_scheduleStyleApplication').mockImplementation(() => {});
+
+    el._observeChildRoots();
+    const wrapper = document.createElement('div');
+    wrapper.appendChild(document.createElement('ha-card'));
+    sr.appendChild(wrapper);
+    await tick();
+
+    expect(spy).toHaveBeenCalledWith(true);
+    el._innerObserver.disconnect();
+  });
+
+  it('ignores everything else: rows, SVG, our own <style>', () => {
+    const el = document.createElement('stack-in-card') as any;
+    const style = document.createElement('style');
+    style.id = el._childStyleTagId;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const row = document.createElement('div');
+    row.appendChild(document.createElement('hui-generic-entity-row'));
+
+    expect(el._mutationsAddHaCard(batch([style]))).toBe(false);
+    expect(el._mutationsAddHaCard(batch([svg]))).toBe(false);
+    expect(el._mutationsAddHaCard(batch([row]))).toBe(false);
+    expect(el._mutationsAddHaCard(batch([document.createTextNode('x')]))).toBe(false);
+    expect(el._mutationsAddHaCard(batch([document.createElement('ha-card')]))).toBe(true);
+  });
+
+  it('is torn down with the element', () => {
+    const el = document.createElement('stack-in-card') as any;
+    const { stack } = lateStack();
+    el._card = stack;
+    el._observeChildRoots();
+    expect(el._innerObserver).toBeTruthy();
+    el.disconnectedCallback();
+    expect(el._innerObserver).toBeUndefined();
+  });
+});

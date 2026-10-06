@@ -42,6 +42,12 @@ export default class StackInCard extends LitElement implements LovelaceCard {
   private _styleApplyRafHandle: ReturnType<typeof requestAnimationFrame> | null = null;
   private _styleApplyTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
   private _childObserver?: MutationObserver;
+  // Second observer, on the shadow roots of the child cards themselves. The one
+  // above stops at those boundaries, so an ha-card a child mounts there later
+  // (a warning swapped for the real card, a template re-rendering) was missed.
+  // Deliberately separate: its filter is far stricter (see _mutationsAddHaCard),
+  // because every state update re-renders something inside those roots.
+  private _innerObserver?: MutationObserver;
   // Tracks pending _applyChildCss retry timeouts so they can be cancelled
   // when the stack is rebuilt or the element is disconnected, preventing
   // stale CSS injection into new or removed card structures.
@@ -191,6 +197,8 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     this._retryTimeouts.clear();
     this._childObserver?.disconnect();
     this._childObserver = undefined;
+    this._innerObserver?.disconnect();
+    this._innerObserver = undefined;
     this._cardPromise = undefined;
   }
 
@@ -271,6 +279,7 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     // injected <style> tags trigger childList mutations that loop us back
     // into _scheduleStyleApplication. We reconnect after pass 2.
     this._childObserver?.disconnect();
+    this._innerObserver?.disconnect();
 
     // Wait for the stack to render its children
     const stack = this._card as unknown as LitElement;
@@ -293,10 +302,10 @@ export default class StackInCard extends LitElement implements LovelaceCard {
       if (stackRoot) stackRoot.style.padding = '8px';
     }
 
-    // (Re-)observe future mutations in the stack's own tree — i.e. children
-    // that hui-card swaps in or out (conditional cards, ll-rebuild). This does
-    // NOT see inside a child's own shadow root: an ha-card a child mounts there
-    // after pass 2 (e.g. hui-warning replaced by the real card) stays unstyled.
+    // (Re-)observe future mutations: the stack's own tree (children that
+    // hui-card swaps in or out — conditional cards, ll-rebuild) and, with a
+    // stricter filter, the shadow root of each child (an ha-card mounted there
+    // after pass 2, e.g. a warning replaced by the real card).
     this._ensureChildObserver();
   }
 
@@ -311,7 +320,7 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     // again, so late-mounting children (conditional cards, ll-rebuild swaps)
     // were silently left unstyled. Mounts inside a child's shadow root are
     // out of reach for this observer (MutationObserver stops at shadow
-    // boundaries).
+    // boundaries) — _observeChildRoots covers those.
     if (!this._childObserver) {
       this._childObserver = new MutationObserver((mutations) => {
         if (this._mutationsWarrantRestyle(mutations)) {
@@ -320,6 +329,62 @@ export default class StackInCard extends LitElement implements LovelaceCard {
       });
     }
     this._childObserver.observe(root, { childList: true, subtree: true });
+    this._observeChildRoots();
+  }
+
+  /**
+   * Watch the shadow root of every child card the walker looks into, so an
+   * ha-card that mounts there after pass 2 gets styled too. Re-collected on
+   * every pass: rebuilt children (preview switch, ll-rebuild) bring new roots.
+   */
+  private _observeChildRoots(): void {
+    const root = this._card?.shadowRoot?.getElementById('root');
+    if (!root) return;
+    if (!this._innerObserver) {
+      this._innerObserver = new MutationObserver((mutations) => {
+        if (this._mutationsAddHaCard(mutations)) this._scheduleStyleApplication(true);
+      });
+    }
+    this._innerObserver.disconnect();
+    this._collectChildRoots(root).forEach((sr) =>
+      this._innerObserver!.observe(sr, { childList: true, subtree: true }),
+    );
+  }
+
+  /** Shadow roots of the child cards, in the places `_walkChildren` looks:
+   * the child element's own root, plus the children of a nested stack. */
+  private _collectChildRoots(from: Element, acc: ShadowRoot[] = []): ShadowRoot[] {
+    for (const el of Array.from(from.children)) {
+      if (el.tagName === 'STACK-IN-CARD') continue;
+      const sr = el.shadowRoot;
+      if (sr) {
+        acc.push(sr);
+        const inner = sr.getElementById('root');
+        if (inner && /-STACK-CARD$/.test(el.tagName)) this._collectChildRoots(inner, acc);
+      }
+      this._collectChildRoots(el, acc);
+    }
+    return acc;
+  }
+
+  /**
+   * Much stricter than `_mutationsWarrantRestyle`: react only when an `ha-card`
+   * itself arrives, or an element that holds one. Anything else inside a child
+   * (entity rows, graph nodes, our own <style> tags) can't need stripping, and
+   * these roots mutate on every state update.
+   */
+  private _mutationsAddHaCard(mutations: MutationRecord[]): boolean {
+    for (const m of mutations) {
+      if (m.type !== 'childList') continue;
+      for (let i = 0; i < m.addedNodes.length; i++) {
+        const node = m.addedNodes[i];
+        if (node.nodeType !== Node.ELEMENT_NODE) continue;
+        const el = node as Element;
+        if (el.namespaceURI === 'http://www.w3.org/2000/svg') continue;
+        if (el.tagName === 'HA-CARD' || el.querySelector('ha-card')) return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -355,6 +420,8 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     // Tear down a previous observer before we swap the inner card out
     this._childObserver?.disconnect();
     this._childObserver = undefined;
+    this._innerObserver?.disconnect();
+    this._innerObserver = undefined;
     // Cancel stale _applyChildCss retries from the previous stack — otherwise
     // they would inject old CSS into the freshly rebuilt card structure.
     this._retryTimeouts.forEach((id) => clearTimeout(id));
