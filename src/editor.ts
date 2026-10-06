@@ -606,13 +606,13 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
                   <div class="paste-entry__title">
                     ${this.hass!.localize?.(
                       'ui.panel.lovelace.editor.card.generic.paste',
-                    ) ?? 'Paste from clipboard'}
+                    ) || 'Paste from clipboard'}
                   </div>
                   <div class="paste-entry__sub">
                     ${this.hass!.localize?.(
                       'ui.panel.lovelace.editor.card.generic.paste_description',
                       { type: this._clipboardCard.type },
-                    ) ?? this._clipboardCard.type}
+                    ) || this._clipboardCard.type}
                   </div>
                 </div>
               </button>
@@ -767,8 +767,8 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
                   <!-- GUI/YAML toggle (HA's order: this comes first) -->
                   <ha-icon-button
                     .label=${this._childGuiMode
-                      ? this.hass!.localize?.('ui.panel.lovelace.editor.edit_card.show_code_editor') ?? 'Show code editor'
-                      : this.hass!.localize?.('ui.panel.lovelace.editor.edit_card.show_visual_editor') ?? 'Show visual editor'}
+                      ? this.hass!.localize?.('ui.panel.lovelace.editor.edit_card.show_code_editor') || 'Show code editor'
+                      : this.hass!.localize?.('ui.panel.lovelace.editor.edit_card.show_visual_editor') || 'Show visual editor'}
                     .path=${this._childGuiMode ? mdiCodeBraces : mdiListBoxOutline}
                     @click=${this._toggleChildEditorMode}
                   ></ha-icon-button>
@@ -777,7 +777,7 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
                   ${this._hasArrowButtons
                     ? html`<ha-icon-button-arrow-prev
                         .hass=${this.hass}
-                        .label=${this.hass!.localize?.('ui.panel.lovelace.editor.edit_card.move_before') ?? 'Move before'}
+                        .label=${this.hass!.localize?.('ui.panel.lovelace.editor.edit_card.move_before') || 'Move before'}
                         .disabled=${selected === 0}
                         .move=${-1}
                         @click=${this._handleMove}
@@ -794,7 +794,7 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
                   ${this._hasArrowButtons
                     ? html`<ha-icon-button-arrow-next
                         .hass=${this.hass}
-                        .label=${this.hass!.localize?.('ui.panel.lovelace.editor.edit_card.move_after') ?? 'Move after'}
+                        .label=${this.hass!.localize?.('ui.panel.lovelace.editor.edit_card.move_after') || 'Move after'}
                         .disabled=${selected === cards.length - 1}
                         .move=${1}
                         @click=${this._handleMove}
@@ -809,21 +809,21 @@ export default class StackInCardEditor extends LitElement implements LovelaceCar
 
                   <!-- Copy -->
                   <ha-icon-button
-                    .label=${this.hass!.localize?.('ui.panel.lovelace.editor.edit_card.copy') ?? 'Copy'}
+                    .label=${this.hass!.localize?.('ui.panel.lovelace.editor.edit_card.copy') || 'Copy'}
                     .path=${mdiContentCopy}
                     @click=${this._copyChild}
                   ></ha-icon-button>
 
                   <!-- Cut -->
                   <ha-icon-button
-                    .label=${this.hass!.localize?.('ui.panel.lovelace.editor.edit_card.cut') ?? 'Cut'}
+                    .label=${this.hass!.localize?.('ui.panel.lovelace.editor.edit_card.cut') || 'Cut'}
                     .path=${mdiContentCut}
                     @click=${this._cutChild}
                   ></ha-icon-button>
 
                   <!-- Delete -->
                   <ha-icon-button
-                    .label=${this.hass!.localize?.('ui.panel.lovelace.editor.edit_card.delete') ?? 'Delete'}
+                    .label=${this.hass!.localize?.('ui.panel.lovelace.editor.edit_card.delete') || 'Delete'}
                     .path=${mdiDelete}
                     @click=${this._handleDelete}
                   ></ha-icon-button>

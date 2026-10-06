@@ -37,6 +37,7 @@ export default class StackInCard extends LitElement implements LovelaceCard {
   @state() private _config?: StackInCardConfig;
 
   private _hass?: HASS;
+  private _preview = false;
   private _cardPromise?: Promise<LovelaceCard>;
   private _styleApplyRafHandle: ReturnType<typeof requestAnimationFrame> | null = null;
   private _styleApplyTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
@@ -115,6 +116,19 @@ export default class StackInCard extends LitElement implements LovelaceCard {
 
   get hass(): HASS | undefined {
     return this._hass;
+  }
+
+  // HA tells a card it is shown in the dashboard editor through `preview`. Its
+  // own stacks pass it to every child (hui-stack-card.ts), and hui-card then
+  // shows children whose visibility conditions are currently unmet. We must
+  // pass it on too, or such children stay hidden while editing.
+  set preview(preview: boolean) {
+    this._preview = preview;
+    if (this._card) this._card.preview = preview;
+  }
+
+  get preview(): boolean {
+    return this._preview;
   }
 
   public setConfig(config: StackInCardConfig): void {
@@ -279,8 +293,10 @@ export default class StackInCard extends LitElement implements LovelaceCard {
       if (stackRoot) stackRoot.style.padding = '8px';
     }
 
-    // (Re-)observe future async mutations from children (e.g. mushroom /
-    // button-card mounting their inner ha-card later).
+    // (Re-)observe future mutations in the stack's own tree — i.e. children
+    // that hui-card swaps in or out (conditional cards, ll-rebuild). This does
+    // NOT see inside a child's own shadow root: an ha-card a child mounts there
+    // after pass 2 (e.g. hui-warning replaced by the real card) stays unstyled.
     this._ensureChildObserver();
   }
 
@@ -292,8 +308,10 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     // reconnect — so this MUST (re-)observe even when _childObserver already
     // exists. The previous `if (this._childObserver) return` guard turned the
     // observer into a one-shot: after the first disconnect it never observed
-    // again, so late-mounting children (button-card templates, conditional
-    // cards, ll-rebuild swaps) were silently left unstyled.
+    // again, so late-mounting children (conditional cards, ll-rebuild swaps)
+    // were silently left unstyled. Mounts inside a child's shadow root are
+    // out of reach for this observer (MutationObserver stops at shadow
+    // boundaries).
     if (!this._childObserver) {
       this._childObserver = new MutationObserver((mutations) => {
         if (this._mutationsWarrantRestyle(mutations)) {
@@ -385,6 +403,7 @@ export default class StackInCard extends LitElement implements LovelaceCard {
     // Ensure the freshest hass is on the element (the value may have changed
     // between scheduling and resolution).
     if (this._hass) element.hass = this._hass;
+    if (this._preview) element.preview = true;
 
     this._card = element;
 
@@ -447,6 +466,26 @@ export default class StackInCard extends LitElement implements LovelaceCard {
       if (!el) return;
       // Don't recurse into nested stack-in-card – it manages its own children
       if (el.tagName === 'STACK-IN-CARD') return;
+
+      // A stack's children sit in its #root, and `querySelector` also sees the
+      // light DOM of those children (hui-card renders into itself). A child
+      // whose own ha-card has no shadow root would therefore be taken for the
+      // stack's card: only that one ha-card got styled and #root was never
+      // walked, leaving every other child with its frame. For a stack, only an
+      // ha-card OUTSIDE #root is its own — and #root is always walked.
+      if (el.shadowRoot && (el === element || /-STACK-CARD$/.test(el.tagName))) {
+        const root =
+          el.shadowRoot.getElementById('root') || el.shadowRoot.getElementById('card');
+        if (root) {
+          const own = Array.from(el.shadowRoot.querySelectorAll('ha-card')).find(
+            (c) => !root.contains(c as Node),
+          );
+          if (own) this._applyCardStyle(own as HTMLElement, withBackground);
+          this._stripMargin(root);
+          root.childNodes.forEach((n: ChildNode) => visit(n));
+          return;
+        }
+      }
 
       // If this element has a shadowRoot with an ha-card directly, style it
       if (el.shadowRoot) {

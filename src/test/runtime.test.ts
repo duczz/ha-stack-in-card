@@ -183,3 +183,73 @@ describe('Empty-state icon is an inline <svg>, not ha-svg-icon', () => {
     el.remove();
   });
 });
+
+// Builds an inner stack the way HA does: #root > hui-card (light DOM) > child.
+// A child either keeps its ha-card in a shadow root (usual) or in its light DOM.
+function stackOf(kinds: ('shadow' | 'light')[]) {
+  const stack = document.createElement('div');
+  const sr = stack.attachShadow({ mode: 'open' });
+  const root = document.createElement('div');
+  root.id = 'root';
+  sr.appendChild(root);
+  const haCards = kinds.map((kind) => {
+    const huiCard = document.createElement('hui-card');
+    const child = document.createElement('x-child');
+    const haCard = document.createElement('ha-card');
+    if (kind === 'shadow') child.attachShadow({ mode: 'open' }).appendChild(haCard);
+    else child.appendChild(haCard);
+    huiCard.appendChild(child);
+    root.appendChild(huiCard);
+    return haCard;
+  });
+  return { stack, root, haCards };
+}
+
+describe('_walkChildren — a light-DOM ha-card in one child must not hide the others', () => {
+  const walk = (kinds: ('shadow' | 'light')[]) => {
+    const el = document.createElement('stack-in-card') as any;
+    el._config = { keep: {} };
+    const s = stackOf(kinds);
+    el._walkChildren(s.stack, false);
+    el._walkChildren(s.stack, true);
+    return s;
+  };
+
+  it.each([
+    [['shadow', 'light', 'shadow']],
+    [['light', 'shadow', 'shadow']],
+    [['shadow', 'shadow', 'light']],
+    [['light', 'light']],
+  ] as const)('strips every child for %j', (kinds) => {
+    const { haCards, root } = walk([...kinds]);
+    expect(haCards.map((c) => c.style.borderRadius)).toEqual(kinds.map(() => '0px'));
+    expect(root.style.margin).toBe('0px');
+  });
+});
+
+describe('preview — passed on to the inner stack', () => {
+  it('forwards a later change to an existing stack', () => {
+    const el = document.createElement('stack-in-card') as any;
+    el._card = makeCardWithShadow();
+    el.preview = true;
+    expect(el._card.preview).toBe(true);
+    el.preview = false;
+    expect(el._card.preview).toBe(false);
+  });
+
+  it('sets preview on a stack that is built after it was announced', async () => {
+    (window as any).loadCardHelpers = async () => ({
+      createCardElement: () => {
+        const card: any = document.createElement('div');
+        card.setConfig = () => {};
+        card.getCardSize = () => 1;
+        return card;
+      },
+    });
+    const el = document.createElement('stack-in-card') as any;
+    el.preview = true;
+    el.setConfig({ type: 'custom:stack-in-card', cards: [{ type: 'markdown' }] });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(el._card.preview).toBe(true);
+  });
+});

@@ -16,6 +16,7 @@ export interface LovelaceCard extends HTMLElement {
   hass?: HASS;
   isPanel?: boolean;
   editMode?: boolean;
+  preview?: boolean;
   setConfig(config: LovelaceCardConfig): void;
   getCardSize(): number | Promise<number>;
   style: CSSStyleDeclaration;
